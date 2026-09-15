@@ -112,6 +112,11 @@ export async function POST(request: Request) {
           botStartedAt: true,
           registrationCycle: true,
           createdAt: true,
+          externalIdentities: {
+            where: { provider: 'TELEGRAM' },
+            select: { providerUserId: true },
+            take: 1,
+          },
         },
       });
       if (!result) throw new Error('Не удалось создать профиль');

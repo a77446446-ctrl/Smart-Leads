@@ -2,7 +2,9 @@ export type UserRole = 'user' | 'admin';
 
 export interface User {
   id: string;
-  max_id: string;
+  max_id: string | null;
+  telegram_id: string | null;
+  auth_provider: 'max' | 'telegram';
   name: string;
   role: UserRole;
   balance: number;

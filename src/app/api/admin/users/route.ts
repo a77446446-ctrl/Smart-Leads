@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import { adminGuard } from '@/lib/auth/admin-guard';
 import { requireAdmin } from '@/lib/auth/current-user';
-import { isConfiguredAdminMaxId } from '@/lib/auth/admin-config';
+import { isConfiguredAdminIdentity } from '@/lib/auth/admin-config';
 import { prisma } from '@/lib/prisma';
 
 export const dynamic = 'force-dynamic';
@@ -22,19 +22,29 @@ export async function GET() {
         balance: true,
         rating: true,
         createdAt: true,
+        externalIdentities: {
+          where: { provider: 'TELEGRAM' },
+          select: { providerUserId: true },
+          take: 1,
+        },
       },
     });
 
-    return NextResponse.json(users.map((user) => ({
+    return NextResponse.json(users.map((user) => {
+      const telegramId = user.externalIdentities[0]?.providerUserId ?? null;
+      return {
       id: user.id,
-      maxId: user.maxId.toString(),
+      maxId: user.maxId?.toString() ?? null,
+      telegramId,
+      authProvider: user.maxId ? 'MAX' : 'TELEGRAM',
       name: user.name,
       role: user.role,
       balance: user.balance,
       rating: user.rating,
       createdAt: user.createdAt,
-      manageable: !isConfiguredAdminMaxId(user.maxId),
-    })));
+      manageable: !isConfiguredAdminIdentity({ maxId: user.maxId, telegramId }),
+    };
+    }));
   } catch (error) {
     console.error('Не удалось загрузить пользователей:', error);
     return NextResponse.json({ error: 'Не удалось загрузить пользователей' }, { status: 500 });
@@ -57,12 +67,19 @@ export async function DELETE(request: Request) {
 
     const target = await prisma.user.findFirst({
       where: { id: userId, deletedAt: null },
-      select: { id: true, maxId: true },
+      select: {
+        id: true,
+        maxId: true,
+        externalIdentities: {
+          select: { provider: true, providerUserId: true },
+        },
+      },
     });
     if (!target) {
       return NextResponse.json({ error: 'Пользователь не найден' }, { status: 404 });
     }
-    if (target.id === admin.id || isConfiguredAdminMaxId(target.maxId)) {
+    const targetTelegramId = target.externalIdentities.find((identity) => identity.provider === 'TELEGRAM')?.providerUserId;
+    if (target.id === admin.id || isConfiguredAdminIdentity({ maxId: target.maxId, telegramId: targetTelegramId })) {
       return NextResponse.json({ error: 'Администратора удалить или заблокировать нельзя' }, { status: 403 });
     }
 
@@ -70,11 +87,25 @@ export async function DELETE(request: Request) {
     await prisma.$transaction(async (tx) => {
       if (mode === 'block') {
         const reason = `Полная блокировка администратором ${admin.id}`;
-        await tx.blockedMaxUser.upsert({
-          where: { maxId: target.maxId },
-          create: { maxId: target.maxId, reason },
-          update: { reason, createdAt: now },
-        });
+        if (target.maxId !== null) {
+          await tx.blockedMaxUser.upsert({
+            where: { maxId: target.maxId },
+            create: { maxId: target.maxId, reason },
+            update: { reason, createdAt: now },
+          });
+        }
+        for (const identity of target.externalIdentities) {
+          await tx.blockedExternalIdentity.upsert({
+            where: {
+              provider_providerUserId: {
+                provider: identity.provider,
+                providerUserId: identity.providerUserId,
+              },
+            },
+            create: { provider: identity.provider, providerUserId: identity.providerUserId, reason },
+            update: { reason, createdAt: now },
+          });
+        }
       }
 
       await Promise.all([
@@ -99,7 +130,7 @@ export async function DELETE(request: Request) {
       ok: true,
       message: mode === 'block'
         ? 'Пользователь полностью заблокирован'
-        : 'Пользователь удалён и должен заново войти через MAX и принять документы',
+        : 'Пользователь удалён и должен заново войти и принять документы',
     });
   } catch (error) {
     console.error('Не удалось изменить доступ пользователя:', error);

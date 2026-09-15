@@ -124,14 +124,16 @@ export async function POST(request: Request) {
         where: { id: currentUser.id },
         select: { balance: true, maxId: true, notifyEnabled: true, botStartedAt: true },
       });
-      await enqueuePurchaseDelivery(tx, {
-        purchaseId: purchase.id,
-        leadId: lead.id,
-        userId: currentUser.id,
-        maxId: updatedUser.maxId,
-        notifyEnabled: updatedUser.notifyEnabled,
-        botStartedAt: updatedUser.botStartedAt,
-      });
+      if (updatedUser.maxId !== null) {
+        await enqueuePurchaseDelivery(tx, {
+          purchaseId: purchase.id,
+          leadId: lead.id,
+          userId: currentUser.id,
+          maxId: updatedUser.maxId,
+          notifyEnabled: updatedUser.notifyEnabled,
+          botStartedAt: updatedUser.botStartedAt,
+        });
+      }
       return {
         purchaseId: purchase.id,
         price,

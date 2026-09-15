@@ -14,7 +14,7 @@ test('удалённая учётная запись теряет сессию, 
   assert.match(adminUsers, /notifyEnabled:\s*false/);
   assert.match(adminUsers, /botStartedAt:\s*null/);
   assert.match(adminUsers, /registrationCycle:\s*\{\s*increment:\s*1\s*\}/);
-  assert.match(adminUsers, /isConfiguredAdminMaxId\(target\.maxId\)/);
+  assert.match(adminUsers, /isConfiguredAdminIdentity\(\{ maxId: target\.maxId, telegramId: targetTelegramId \}\)/);
 });
 
 test('обычное удаление допускает новую регистрацию, а полный блок запрещает все входы', () => {
@@ -28,6 +28,7 @@ test('обычное удаление допускает новую регист
   assert.match(webhookRoute, /blockedMaxUser\.findUnique/);
   assert.match(webhookRoute, /ignored:\s*true/);
   assert.match(adminUsers, /blockedMaxUser\.upsert/);
+  assert.match(adminUsers, /blockedExternalIdentity\.upsert/);
 });
 
 test('админка показывает отдельные действия удаления и полного блока', () => {
@@ -39,7 +40,7 @@ test('админка показывает отдельные действия у
   assert.match(page, /window\.confirm/);
 });
 
-test('после удаления требуется явный вход через MAX и новый комплект согласий', () => {
+test('после удаления требуется явный вход и новый комплект согласий', () => {
   const login = read('src/app/(auth)/login/page.tsx');
   const legal = read('src/lib/legal.ts');
   const schema = read('prisma/schema.prisma');

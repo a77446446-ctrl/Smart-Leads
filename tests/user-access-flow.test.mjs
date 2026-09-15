@@ -4,16 +4,17 @@ import test from 'node:test';
 
 const read = (path) => readFileSync(new URL(`../${path}`, import.meta.url), 'utf8');
 
-test('ADMIN_MAX_IDS является единственным источником административной роли', () => {
+test('административная роль определяется разрешёнными ID MAX или Telegram', () => {
   const adminConfig = read('src/lib/auth/admin-config.ts');
   const authRoute = read('src/app/api/auth/max/route.ts');
   const currentUser = read('src/lib/auth/current-user.ts');
 
   assert.match(adminConfig, /process\.env\.ADMIN_MAX_IDS/);
+  assert.match(adminConfig, /process\.env\.ADMIN_TELEGRAM_IDS/);
   assert.match(authRoute, /role: configuredAdmin \? 'ADMIN' : 'USER'/);
   assert.doesNotMatch(authRoute, /\.\.\.\(configuredAdmin \?/);
-  assert.match(currentUser, /if \(!isConfiguredAdminMaxId\(user\.maxId\)\)/);
-  assert.match(currentUser, /role: isConfiguredAdminMaxId\(user\.maxId\) \? 'admin' : 'user'/);
+  assert.match(currentUser, /if \(!isConfiguredAdminIdentity\(userIdentity\(user\)\)\)/);
+  assert.match(currentUser, /role: isConfiguredAdminIdentity\(identity\) \? 'admin' : 'user'/);
 });
 
 test('профиль доступен обычному пользователю и защищён сессией', () => {
@@ -44,7 +45,7 @@ test('обычный пользователь принимает докумен�
   assert.match(dashboardLayout, /profile\.role === 'user'/);
   assert.match(dashboardLayout, /api\/legal\/acceptance/);
   assert.match(legalApi, /adminExemption/);
-  assert.match(legal, /if \(isConfiguredAdminMaxId\(user\.maxId\)\) return true/);
+  assert.match(legal, /if \(isConfiguredAdminIdentity\(/);
 });
 
 test('платёж возвращает пользователя в подписки, а не в закрытый профиль', () => {

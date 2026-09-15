@@ -12,8 +12,13 @@ interface Transaction {
   createdAt: string;
   user: {
     name: string;
-    maxId: string;
+    maxId: string | null;
+    telegramId: string | null;
   };
+}
+
+function identityLabel(user: Transaction['user']): string {
+  return user.maxId ? `MAX: ${user.maxId}` : `TELEGRAM: ${user.telegramId || '—'}`;
 }
 
 function transactionLabel(type: Transaction['type']) {
@@ -128,7 +133,7 @@ export default function PaymentsPage() {
                   </div>
                 </div>
                 <div className="mt-4 flex items-center justify-between border-t border-zinc-800 pt-4">
-                  <div className="min-w-0"><div className="truncate text-xs sm:text-sm font-bold text-white">{transaction.user.name}</div><div className="mt-1 truncate text-[10px] font-bold text-zinc-500">ID: {transaction.user.maxId}</div></div>
+                  <div className="min-w-0"><div className="truncate text-xs sm:text-sm font-bold text-white">{transaction.user.name}</div><div className="mt-1 truncate text-[10px] font-bold text-zinc-500">{identityLabel(transaction.user)}</div></div>
                   <span className="rounded border border-green-800 bg-green-900/30 px-2 py-1 text-[9px] font-bold uppercase text-green-400">Успешно</span>
                 </div>
               </article>
@@ -150,7 +155,7 @@ export default function PaymentsPage() {
                     <tr key={transaction.id} className="border-b border-zinc-800/50 transition-colors hover:bg-zinc-800/50">
                       <td className="px-8 py-4"><div className="flex items-center gap-3"><TransactionIcon type={transaction.type} /><div className="font-bold text-white">{transactionLabel(transaction.type)}</div></div></td>
                       <td className={cn('px-6 py-4 text-lg font-bold', transaction.type === 'TOPUP' ? 'text-green-400' : 'text-white')}>{transaction.type === 'TOPUP' ? '+' : '-'}{transaction.amount} ₽</td>
-                      <td className="px-6 py-4"><div className="font-bold text-white">{transaction.user.name}</div><div className="text-[10px] font-bold text-zinc-500">ID: {transaction.user.maxId}</div></td>
+                      <td className="px-6 py-4"><div className="font-bold text-white">{transaction.user.name}</div><div className="text-[10px] font-bold text-zinc-500">{identityLabel(transaction.user)}</div></td>
                       <td className="px-6 py-4 font-bold text-zinc-400">{formatDate(transaction.createdAt)}</td>
                       <td className="px-8 py-4 text-right"><span className="rounded border border-green-800 bg-green-900/30 px-2 py-1 text-[10px] font-bold uppercase text-green-400">Успешно</span></td>
                     </tr>

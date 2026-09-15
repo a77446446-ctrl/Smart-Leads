@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { AuthenticationError, requireCurrentUser } from '@/lib/auth/current-user';
-import { isConfiguredAdminMaxId } from '@/lib/auth/admin-config';
+import { isConfiguredAdminIdentity } from '@/lib/auth/admin-config';
 import { getLegalAcceptance, getLegalConfig, legalDocumentHash, LEGAL_DOCUMENT_TYPES } from '@/lib/legal';
 import { prisma } from '@/lib/prisma';
 
@@ -22,7 +22,7 @@ function adminExemption() {
 export async function GET() {
   try {
     const user = await requireCurrentUser();
-    if (isConfiguredAdminMaxId(user.maxId)) return NextResponse.json(adminExemption());
+    if (isConfiguredAdminIdentity({ maxId: user.maxId, telegramId: user.externalIdentities[0]?.providerUserId })) return NextResponse.json(adminExemption());
     const acceptance = await getLegalAcceptance(user.id);
     return NextResponse.json({ ...acceptance, exempt: false, documents });
   } catch (error) {
@@ -34,7 +34,7 @@ export async function GET() {
 export async function POST(request: Request) {
   try {
     const user = await requireCurrentUser();
-    if (isConfiguredAdminMaxId(user.maxId)) return NextResponse.json(adminExemption());
+    if (isConfiguredAdminIdentity({ maxId: user.maxId, telegramId: user.externalIdentities[0]?.providerUserId })) return NextResponse.json(adminExemption());
 
     const body = await request.json() as { acceptedDocuments?: unknown; version?: unknown };
     const { version } = getLegalConfig();

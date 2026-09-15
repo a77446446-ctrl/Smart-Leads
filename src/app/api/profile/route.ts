@@ -31,6 +31,9 @@ export async function PATCH(request: Request) {
     if (typeof notifyEnabled !== 'boolean') {
       return NextResponse.json({ error: 'Некорректное значение уведомлений' }, { status: 400 });
     }
+    if (notifyEnabled && currentUser.maxId === null) {
+      return NextResponse.json({ error: 'Уведомления MAX доступны после входа через MAX' }, { status: 409 });
+    }
     const updateData: any = { notifyEnabled };
     if (notifyEnabled && !currentUser.botStartedAt) {
       updateData.botStartedAt = new Date();
@@ -50,6 +53,11 @@ export async function PATCH(request: Request) {
         botStartedAt: true,
         registrationCycle: true,
         createdAt: true,
+        externalIdentities: {
+          where: { provider: 'TELEGRAM' },
+          select: { providerUserId: true },
+          take: 1,
+        },
       },
     });
     return NextResponse.json(serializeCurrentUser(user));

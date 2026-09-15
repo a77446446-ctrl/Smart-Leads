@@ -20,6 +20,11 @@ export async function GET() {
           select: {
             name: true,
             maxId: true,
+            externalIdentities: {
+              where: { provider: 'TELEGRAM' },
+              select: { providerUserId: true },
+              take: 1,
+            },
           },
         },
       },
@@ -32,7 +37,8 @@ export async function GET() {
       createdAt: transaction.createdAt,
       user: {
         name: transaction.user.name,
-        maxId: transaction.user.maxId.toString(),
+        maxId: transaction.user.maxId?.toString() ?? null,
+        telegramId: transaction.user.externalIdentities[0]?.providerUserId ?? null,
       },
     })));
   } catch (error) {

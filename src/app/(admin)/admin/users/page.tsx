@@ -7,13 +7,19 @@ import { cn } from '@/lib/utils';
 
 interface User {
   id: string;
-  maxId: string;
+  maxId: string | null;
+  telegramId: string | null;
+  authProvider: 'MAX' | 'TELEGRAM';
   name: string;
   role: string;
   balance: number;
   rating: number;
   createdAt: string;
   manageable: boolean;
+}
+
+function identityLabel(user: User): string {
+  return `${user.authProvider}: ${user.maxId || user.telegramId || '—'}`;
 }
 
 function formatDate(value: string) {
@@ -80,7 +86,7 @@ export default function UsersPage() {
 
     const confirmed = window.confirm(mode === 'block'
       ? `Полностью заблокировать ${user.name}? Пользователь больше не сможет зарегистрироваться.`
-      : `Удалить ${user.name}? Активные подписки завершатся. Для возврата потребуется заново войти через MAX и принять документы.`);
+      : `Удалить ${user.name}? Активные подписки завершатся. Для возврата потребуется заново войти и принять документы.`);
     if (!confirmed) return;
 
     setPendingAction(`${user.id}:${mode}`);
@@ -113,7 +119,9 @@ export default function UsersPage() {
     if (!query) return users;
 
     return users.filter((user) => (
-      user.name.toLocaleLowerCase('ru-RU').includes(query) || user.maxId.includes(query)
+      user.name.toLocaleLowerCase('ru-RU').includes(query)
+      || user.maxId?.includes(query)
+      || user.telegramId?.includes(query)
     ));
   }, [search, users]);
 
@@ -179,7 +187,7 @@ export default function UsersPage() {
                   </div>
                   <div className="min-w-0 flex-1">
                     <div className="truncate font-bold text-white">{user.name}</div>
-                    <div className="mt-1 truncate text-[10px] font-bold uppercase tracking-wider text-zinc-500">ID: {user.maxId}</div>
+                    <div className="mt-1 truncate text-[10px] font-bold uppercase tracking-wider text-zinc-500">{identityLabel(user)}</div>
                   </div>
                   <RoleBadge role={user.role} />
                 </div>
@@ -219,7 +227,7 @@ export default function UsersPage() {
                 <tbody className="text-sm bg-transparent">
                   {filteredUsers.map((user) => (
                     <tr key={user.id} className="group border-b border-zinc-800/50 transition-colors hover:bg-zinc-800/50">
-                      <td className="px-8 py-5"><div className="font-bold text-white group-hover:text-accent">{user.name}</div><div className="mt-1 text-[10px] font-bold uppercase tracking-widest text-zinc-500">ID: {user.maxId}</div></td>
+                      <td className="px-8 py-5"><div className="font-bold text-white group-hover:text-accent">{user.name}</div><div className="mt-1 text-[10px] font-bold uppercase tracking-widest text-zinc-500">{identityLabel(user)}</div></td>
                       <td className="px-6 py-5"><RoleBadge role={user.role} /></td>
                       <td className="px-6 py-5 font-bold text-white">{user.balance} ₽</td>
                       <td className="px-6 py-5 font-bold text-zinc-200"><span className="text-accent">★</span> {user.rating.toFixed(1)}</td>

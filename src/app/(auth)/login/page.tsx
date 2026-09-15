@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useEffect, useState } from 'react';
-import { ExternalLink, Loader2 } from 'lucide-react';
+import { ExternalLink, Loader2, Send } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { useUser } from '@/store/useUser';
 import type { User } from '@/types';
@@ -43,6 +43,16 @@ export default function LoginPage() {
     // If not, we might still be inside MAX but just opened it without initData? 
     // Usually WebApp.initData is always there in a mini app.
     setIsInsideMax(!!window.WebApp?.initData);
+    const telegramError = new URLSearchParams(window.location.search).get('error');
+    if (telegramError) {
+      const messages: Record<string, string> = {
+        telegram_not_configured: 'Вход через Telegram пока не настроен владельцем приложения.',
+        telegram_cancelled: 'Вход через Telegram отменён.',
+        telegram_blocked: 'Учётная запись Telegram заблокирована.',
+        telegram_failed: 'Не удалось войти через Telegram. Повторите попытку.',
+      };
+      setError(messages[telegramError] || 'Не удалось войти через Telegram.');
+    }
 
     fetch('/api/profile', { cache: 'no-store' })
       .then(async (response) => {
@@ -138,6 +148,15 @@ export default function LoginPage() {
             <span>Открыть приложение в MAX Web</span>
           </a>
         )}
+
+        <a
+          href="/api/auth/telegram/start"
+          aria-disabled={checkingSession}
+          className="w-full bg-[#229ED9] text-white border-2 border-black py-4 px-2 text-xs sm:text-sm font-black uppercase tracking-wider hover:brightness-95 active:scale-[0.98] transition-all flex items-center justify-center gap-2 text-center"
+        >
+          <Send size={18} className="shrink-0" />
+          <span>Войти через Telegram</span>
+        </a>
 
         {isLocalDevelopment && (
           <>

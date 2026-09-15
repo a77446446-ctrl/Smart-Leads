@@ -46,6 +46,9 @@ export async function POST(request: Request) {
     if (!categoryId || categoryId.length > 100 || typeof enabled !== 'boolean') {
       return NextResponse.json({ error: 'Некорректная настройка категории' }, { status: 400 });
     }
+    if (enabled && user.maxId === null) {
+      return NextResponse.json({ error: 'Уведомления MAX доступны после входа через MAX' }, { status: 409 });
+    }
     const userUpdates: any = {};
     if (enabled) {
       userUpdates.notifyEnabled = true;

@@ -95,7 +95,9 @@ export default function ProfilePage() {
         </div>
         <div>
           <h2 className="text-2xl font-black text-black uppercase">{user.name}</h2>
-          <p className="text-[#666] text-sm font-bold">ID: {user.max_id}</p>
+          <p className="text-[#666] text-sm font-bold">
+            {user.max_id ? `MAX: ${user.max_id}` : `Telegram: ${user.telegram_id}`}
+          </p>
           <div className="mt-1 bg-black text-white border border-black px-2 py-0.5 text-[10px] font-black inline-block uppercase">
             {user.role}
           </div>
@@ -116,7 +118,7 @@ export default function ProfilePage() {
       </div>
 
       {/* Category Subscriptions */}
-      {categoryPreferences.length > 0 && (
+      {user.max_id && categoryPreferences.length > 0 && (
         <div className="bg-white border border-black p-4 space-y-3 shadow-[2px_2px_0px_0px_rgba(0,0,0,1)]">
           <div className="flex justify-between items-start">
             <div>
@@ -167,7 +169,7 @@ export default function ProfilePage() {
 
       {/* Menu */}
       <div className="space-y-2">
-        <div className="w-full flex items-center justify-between p-4 glass-panel transition-colors border-black">
+        {user.max_id ? <div className="w-full flex items-center justify-between p-4 glass-panel transition-colors border-black">
           <div className="flex items-center gap-3 font-bold text-black uppercase text-sm">
             <div className="border border-black bg-white text-black p-2"><Settings size={18} /></div>
             Уведомления
@@ -186,7 +188,11 @@ export default function ProfilePage() {
               className={`h-5 w-5 rounded-full border border-black bg-white transition-transform ${user.notify_enabled ? 'translate-x-5' : 'translate-x-0'}`}
             />
           </button>
-        </div>
+        </div> : (
+          <div className="w-full p-4 glass-panel border-black text-xs font-bold text-[#666]">
+            Уведомления MAX станут доступны после входа через MAX.
+          </div>
+        )}
 
         {user.role === 'admin' && (
         <Link 

@@ -2,7 +2,7 @@ import 'server-only';
 
 import { createHash } from 'crypto';
 import { prisma } from '@/lib/prisma';
-import { isConfiguredAdminMaxId } from '@/lib/auth/admin-config';
+import { isConfiguredAdminIdentity } from '@/lib/auth/admin-config';
 
 export const LEGAL_DOCUMENT_TYPES = ['OFFER', 'PRIVACY', 'CONSENT'] as const;
 export type LegalDocumentType = typeof LEGAL_DOCUMENT_TYPES[number];
@@ -61,9 +61,16 @@ export async function getLegalAcceptance(userId: string) {
 export async function hasCurrentLegalAcceptance(userId: string): Promise<boolean> {
   const user = await prisma.user.findFirst({
     where: { id: userId, deletedAt: null },
-    select: { maxId: true },
+    select: {
+      maxId: true,
+      externalIdentities: {
+        where: { provider: 'TELEGRAM' },
+        select: { providerUserId: true },
+        take: 1,
+      },
+    },
   });
   if (!user) return false;
-  if (isConfiguredAdminMaxId(user.maxId)) return true;
+  if (isConfiguredAdminIdentity({ maxId: user.maxId, telegramId: user.externalIdentities[0]?.providerUserId })) return true;
   return (await getLegalAcceptance(userId)).accepted;
 }
