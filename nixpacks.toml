@@ -1,0 +1,37 @@
+providers = ["node"]
+
+[variables]
+PARSER_PYTHON_EXECUTABLE = "/opt/venv/bin/python"
+PLAYWRIGHT_BROWSERS_PATH = "/opt/venv/playwright-browsers"
+
+[phases.setup]
+aptPkgs = [
+  "...", 
+  "python3", 
+  "python3-venv", 
+  "python3-pip",
+  "libnss3",
+  "libatk-bridge2.0-0",
+  "libxcomposite1",
+  "libxrandr2",
+  "libgbm1",
+  "libpango-1.0-0",
+  "libasound2t64",
+  "libcups2t64",
+  "libxss1",
+  "libgtk-3-0"
+]
+
+[phases.playwright]
+dependsOn = ["install"]
+cmds = [
+  "python3 -m venv /opt/venv",
+  "/opt/venv/bin/pip install --no-cache-dir -r requirements-parser.txt",
+  "/opt/venv/bin/python -m playwright install --with-deps chromium",
+]
+
+[phases.build]
+dependsOn = ["...", "playwright"]
+
+[start]
+cmd = "npm start"

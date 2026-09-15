@@ -1,0 +1,25 @@
+// Единая точка запуска не создаёт отдельный Node-процесс на каждый файл в Windows CI.
+await import('./security-foundation.test.mjs');
+await import('./admin-rbac.test.mjs');
+await import('./dev-api-security.test.mjs');
+await import('./api-security.test.mjs');
+await import('./auth-security.test.mjs');
+await import('./user-access-flow.test.mjs');
+await import('./user-management.test.mjs');
+await import('./lead-date.test.mjs');
+await import('./lead-category.test.mjs');
+await import('./parser-category-flow.test.mjs');
+await import('./lead-quality.test.mjs');
+await import('./max-bot-stage-2.test.mjs');
+await import('./cron-bot-reliability.test.mjs');
+await import('./image-upload-security.test.mjs');
+await import('./parser-stage-3.test.mjs');
+await import('./auth-qr-regression.test.mjs');
+await import('./runtime-and-settings-regression.test.mjs');
+await import('./chat-discovery-stage-4.test.mjs');
+await import('./legal-stage-5.test.mjs');
+await import('./yookassa-stage-6.test.mjs');
+
+await import('./lead-presentation.test.mjs');
+await import('./lead-display-regression.test.mjs');
+await import('./branding.test.mjs');

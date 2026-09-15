@@ -1,0 +1,24 @@
+# В образ попадают только исходники и публичные ресурсы.
+node_modules
+.next
+.venv
+.git
+.env
+.env.*
+!.env.example
+sessions
+data
+uploads
+backups
+debug_screenshots
+scratch
+__pycache__
+*.pyc
+*.db
+*.db-*
+*.sqlite*
+*.log
+*.tsbuildinfo
+public/uploads
+*.rar
+*.zip

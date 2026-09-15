@@ -1,0 +1,311 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider   = "prisma-client-js"
+  engineType = "library"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+model User {
+  id                       String                   @id @default(uuid())
+  maxId                    BigInt                   @unique
+  name                     String                   @default("Пользователь MAX")
+  role                     String                   @default("USER")
+  balance                  Int                      @default(0)
+  rating                   Float                    @default(5.0)
+  notifyEnabled            Boolean                  @default(false)
+  onboardingBonusGrantedAt DateTime?
+  botStartedAt             DateTime?
+  lastLoginAt              DateTime?
+  deletedAt                DateTime?
+  registrationCycle        Int                      @default(1)
+  createdAt                DateTime                 @default(now())
+  updatedAt                DateTime                 @updatedAt
+  subscriptions            Subscription[]
+  purchases                Purchase[]
+  transactions             Transaction[]
+  categoryPreferences      UserCategoryPreference[]
+  botDeliveries            BotDelivery[]
+  legalAcceptances         LegalAcceptance[]
+  paymentOrders            PaymentOrder[]
+
+  @@index([deletedAt])
+}
+
+model BlockedMaxUser {
+  maxId     BigInt   @id
+  reason    String?
+  createdAt DateTime @default(now())
+
+  @@index([createdAt])
+}
+
+model Category {
+  id                String                   @id @default(uuid())
+  name              String
+  slug              String                   @unique
+  plusKeywords      String?
+  minusKeywords     String?
+  paymentMode       String                   @default("LEAD")
+  leadPrice         Int                      @default(0)
+  subscriptionPrice Int                      @default(0)
+  days              Int                      @default(30)
+  ttlMinutes        Int                      @default(1440) // Default 24 hours (1440 mins)
+  active            Boolean                  @default(true)
+  imageUrl          String?
+  showcaseChatId    String?
+  showcaseEnabled   Boolean                  @default(false)
+  showcaseKind      String                   @default("PUBLIC")
+  leads             Lead[]
+  subscriptions     Subscription[]
+  userPreferences   UserCategoryPreference[]
+  paymentOrders     PaymentOrder[]
+}
+
+model Subscription {
+  id         String   @id @default(uuid())
+  userId     String
+  user       User     @relation(fields: [userId], references: [id])
+  categoryId String
+  category   Category @relation(fields: [categoryId], references: [id])
+  expiresAt  DateTime
+}
+
+model Lead {
+  id            String        @id @default(uuid())
+  title         String
+  rawText       String
+  phone         String?
+  allowContactless Boolean     @default(false)
+  city          String
+  categoryId    String
+  category      Category      @relation(fields: [categoryId], references: [id])
+  sourceChat    String?
+  fingerprint   String?       @unique
+  contentFingerprint String?  @unique
+  duplicateOfId String?
+  duplicateOf   Lead?         @relation("LeadDuplicates", fields: [duplicateOfId], references: [id], onDelete: Restrict)
+  duplicates    Lead[]        @relation("LeadDuplicates")
+  score         Int           @default(0)
+  price         Int           @default(0)
+  status        String        @default("NEW")
+  createdAt     DateTime      @default(now())
+  deletedAt     DateTime?
+  purchases     Purchase[]
+  botDeliveries BotDelivery[]
+
+  @@index([categoryId, status, deletedAt, createdAt])
+  @@index([contentFingerprint, duplicateOfId])
+  @@index([createdAt])
+  @@index([deletedAt])
+}
+
+model UserCategoryPreference {
+  id         String   @id @default(uuid())
+  userId     String
+  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  categoryId String
+  category   Category @relation(fields: [categoryId], references: [id], onDelete: Cascade)
+  enabled    Boolean  @default(true)
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  @@unique([userId, categoryId])
+  @@index([categoryId, enabled])
+}
+
+model BotDelivery {
+  id               String    @id @default(uuid())
+  kind             String
+  deduplicationKey String    @unique
+  recipientType    String
+  recipientId      String
+  userId           String?
+  user             User?     @relation(fields: [userId], references: [id], onDelete: SetNull)
+  leadId           String?
+  lead             Lead?     @relation(fields: [leadId], references: [id], onDelete: Cascade)
+  status           String    @default("PENDING")
+  attempts         Int       @default(0)
+  availableAt      DateTime  @default(now())
+  lockedAt         DateTime?
+  sentAt           DateTime?
+  lastError        String?
+  maxMessageId     String?
+  createdAt        DateTime  @default(now())
+  updatedAt        DateTime  @updatedAt
+
+  @@index([status, availableAt])
+  @@index([userId])
+  @@index([leadId])
+}
+
+model MaxBotChat {
+  id        String   @id @default(uuid())
+  chatId    String   @unique
+  title     String?
+  kind      String
+  active    Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([active, kind])
+}
+
+model Purchase {
+  id        String    @id @default(uuid())
+  userId    String
+  user      User      @relation(fields: [userId], references: [id])
+  leadId    String
+  lead      Lead      @relation(fields: [leadId], references: [id])
+  price     Int       @default(0)
+  deletedAt DateTime?
+  createdAt DateTime  @default(now())
+
+  @@index([userId, deletedAt])
+  @@index([leadId])
+}
+
+model Transaction {
+  id        String    @id @default(uuid())
+  userId    String
+  user      User      @relation(fields: [userId], references: [id])
+  type      String
+  amount    Int       @default(0)
+  deletedAt DateTime?
+  createdAt DateTime  @default(now())
+
+  @@index([userId, deletedAt, createdAt])
+}
+
+model Setting {
+  id    String @id @default(uuid())
+  key   String @unique
+  value String
+}
+
+model MaksAccount {
+  id                  String    @id @default(uuid())
+  name                String
+  sessionFile         String    @unique
+  sessionData         String? // AES-256-GCM backup Playwright storage_state
+  sessionChecksum     String?
+  sessionUpdatedAt    DateTime?
+  proxyString         String? // Зашифрованный proxy URL; legacy plaintext мигрирует при чтении
+  active              Boolean   @default(true)
+  status              String    @default("AUTHORIZING")
+  lastUsed            DateTime?
+  lastSuccessAt       DateTime?
+  lastErrorAt         DateTime?
+  cooldownUntil       DateTime?
+  consecutiveFailures Int       @default(0)
+  totalRuns           Int       @default(0)
+  totalErrors         Int       @default(0)
+  lastError           String?
+  createdAt           DateTime  @default(now())
+  updatedAt           DateTime  @updatedAt
+
+  @@index([active, status, cooldownUntil])
+}
+
+model ParserLease {
+  id             String    @id
+  token          String?
+  lockedUntil    DateTime?
+  lastStartedAt  DateTime?
+  lastFinishedAt DateTime?
+  lastResult     String?
+  updatedAt      DateTime  @updatedAt
+}
+
+model ParserSeenMessage {
+  fingerprint String   @id
+  sourceChat  String
+  messageId   String?
+  firstSeenAt DateTime @default(now())
+
+  @@index([sourceChat, firstSeenAt])
+}
+
+model TargetChat {
+  id               String    @id @default(uuid())
+  url              String    @unique
+  name             String?
+  provider         String
+  discoveredFrom   String?
+  status           String    @default("PENDING")
+  active           Boolean   @default(false)
+  score            Int       @default(0)
+  parseAll         Boolean   @default(false)
+  discoveryCount   Int       @default(1)
+  lastDiscoveredAt DateTime  @default(now())
+  lastCheckedAt    DateTime?
+  lastError        String?
+  createdAt        DateTime  @default(now())
+  updatedAt        DateTime  @updatedAt
+
+  @@index([active, status])
+  @@index([provider, lastDiscoveredAt])
+}
+
+model DiscoveryRun {
+  id         String    @id @default(uuid())
+  provider   String
+  status     String    @default("RUNNING")
+  queries    Int       @default(0)
+  candidates Int       @default(0)
+  inserted   Int       @default(0)
+  activated  Int       @default(0)
+  error      String?
+  startedAt  DateTime  @default(now())
+  finishedAt DateTime?
+
+  @@index([startedAt])
+  @@index([provider, status])
+}
+
+model LegalAcceptance {
+  id                String   @id @default(uuid())
+  userId            String
+  user              User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  documentType      String
+  version           String
+  registrationCycle Int      @default(1)
+  documentHash      String
+  source            String   @default("MINI_APP")
+  acceptedAt        DateTime @default(now())
+
+  @@unique([userId, documentType, version, registrationCycle], map: "LegalAcceptance_registration_cycle_key")
+  @@index([userId, acceptedAt])
+}
+
+model PaymentOrder {
+  id                String    @id @default(uuid())
+  userId            String
+  user              User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  categoryId        String?
+  category          Category? @relation(fields: [categoryId], references: [id], onDelete: SetNull)
+  clientRequestId   String
+  idempotencyKey    String    @unique
+  providerPaymentId String?   @unique
+  kind              String
+  status            String    @default("CREATED")
+  amount            Int
+  currency          String    @default("RUB")
+  receiptEmail      String
+  description       String
+  subscriptionDays  Int?
+  confirmationUrl   String?
+  creditedAt        DateTime?
+  providerCreatedAt DateTime?
+  lastError         String?
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
+
+  @@unique([userId, clientRequestId])
+  @@index([status, createdAt])
+  @@index([userId, createdAt])
+}
