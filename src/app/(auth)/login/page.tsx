@@ -1,7 +1,8 @@
 'use client';
 
 import React, { useEffect, useState } from 'react';
-import { ExternalLink, Loader2, Send } from 'lucide-react';
+import { Loader2, Send } from 'lucide-react';
+import Image from 'next/image';
 import { useRouter } from 'next/navigation';
 import { useUser } from '@/store/useUser';
 import type { User } from '@/types';
@@ -43,15 +44,16 @@ export default function LoginPage() {
     // If not, we might still be inside MAX but just opened it without initData? 
     // Usually WebApp.initData is always there in a mini app.
     setIsInsideMax(!!window.WebApp?.initData);
-    const telegramError = new URLSearchParams(window.location.search).get('error');
-    if (telegramError) {
+    const loginError = new URLSearchParams(window.location.search).get('error');
+    if (loginError) {
       const messages: Record<string, string> = {
-        telegram_not_configured: 'Вход через Telegram пока не настроен владельцем приложения.',
+        max_not_configured: 'Не удалось войти через MAX: бот пока не настроен владельцем приложения.',
+        telegram_not_configured: 'Не удалось войти через Telegram: нужны Client ID и Client Secret из BotFather.',
         telegram_cancelled: 'Вход через Telegram отменён.',
         telegram_blocked: 'Учётная запись Telegram заблокирована.',
         telegram_failed: 'Не удалось войти через Telegram. Повторите попытку.',
       };
-      setError(messages[telegramError] || 'Не удалось войти через Telegram.');
+      setError(messages[loginError] || 'Не удалось войти. Повторите попытку.');
     }
 
     fetch('/api/profile', { cache: 'no-store' })
@@ -132,20 +134,20 @@ export default function LoginPage() {
             type="button"
             onClick={authenticate}
             disabled={loading || checkingSession}
-            className="w-full bg-accent text-black border-2 border-black py-4 px-2 text-xs sm:text-sm font-black uppercase tracking-wider hover:brightness-95 disabled:opacity-60 disabled:cursor-not-allowed active:scale-[0.98] transition-all flex items-center justify-center gap-2 text-center"
+            className="w-full bg-gradient-to-r from-[#27b9f5] via-[#386af5] to-[#8648dd] text-white border-2 border-black py-4 px-2 text-xs sm:text-sm font-black uppercase tracking-wider hover:brightness-110 disabled:opacity-60 disabled:cursor-not-allowed active:scale-[0.98] transition-all flex items-center justify-center gap-2 text-center"
           >
-            {(loading || checkingSession) && <Loader2 size={18} className="animate-spin shrink-0" />}
-            <span>{checkingSession ? 'ПРОВЕРЯЕМ СЕССИЮ' : loading ? 'ВХОДИМ ЧЕРЕЗ MAX' : '[ НАЧАТЬ РАБОТУ ]'}</span>
+            {(loading || checkingSession) ? <Loader2 size={22} className="animate-spin shrink-0" /> : <Image src="/max-logo.png" alt="" width={24} height={24} className="shrink-0 rounded-[5px]" />}
+            <span>{checkingSession ? 'ПРОВЕРЯЕМ СЕССИЮ' : loading ? 'ВХОДИМ ЧЕРЕЗ MAX' : 'Войти через MAX'}</span>
           </button>
         )}
 
         {isInsideMax === false && (
           <a
             href="/api/auth/max-link"
-            className="w-full bg-accent text-black border-2 border-black py-4 px-2 text-xs sm:text-sm font-bold uppercase tracking-wider hover:brightness-95 active:scale-[0.98] transition-all flex items-center justify-center gap-2 text-center"
+            className="w-full bg-gradient-to-r from-[#27b9f5] via-[#386af5] to-[#8648dd] text-white border-2 border-black py-4 px-2 text-xs sm:text-sm font-black uppercase tracking-wider hover:brightness-110 active:scale-[0.98] transition-all flex items-center justify-center gap-2 text-center"
           >
-            <ExternalLink size={18} className="shrink-0" />
-            <span>Открыть приложение в MAX Web</span>
+            <Image src="/max-logo.png" alt="" width={24} height={24} className="shrink-0 rounded-[5px]" />
+            <span>Войти через MAX</span>
           </a>
         )}
 

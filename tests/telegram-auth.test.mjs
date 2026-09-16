@@ -97,3 +97,16 @@ test('маршруты Telegram используют серверный code flo
   assert.match(schema, /model BlockedExternalIdentity/);
   assert.match(schema, /maxId\s+BigInt\?/);
 });
+
+test('кнопки MAX и Telegram показывают ошибки своего провайдера', () => {
+  const login = read('src/app/(auth)/login/page.tsx');
+  const maxLink = read('src/app/api/auth/max-link/route.ts');
+  const maxLogo = readFileSync(new URL('../public/max-logo.png', import.meta.url));
+
+  assert.match(login, /max_not_configured: 'Не удалось войти через MAX:/);
+  assert.match(login, /telegram_not_configured: 'Не удалось войти через Telegram:/);
+  assert.match(login, /<span>Войти через MAX<\/span>/);
+  assert.match(login, /src="\/max-logo\.png"/);
+  assert.match(maxLink, /login\.searchParams\.set\('error', 'max_not_configured'\)/);
+  assert.equal(maxLogo.subarray(0, 8).toString('hex'), '89504e470d0a1a0a');
+});
