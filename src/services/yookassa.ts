@@ -118,7 +118,8 @@ export async function createPaymentOrder(userId: string, input: {
     throw error;
   }
 
-  const vatCode = Math.min(6, Math.max(1, Number.parseInt(process.env.YOOKASSA_VAT_CODE || '1', 10) || 1));
+  const vatCode = Number(process.env.YOOKASSA_VAT_CODE || '1');
+  if (!Number.isInteger(vatCode) || vatCode < 1 || vatCode > 12) throw new Error('Некорректный код НДС ЮKassa');
   try {
     const payment = await requestYoo('/payments', { method: 'POST', idempotencyKey, body: {
       amount: { value: amountValue(amount), currency: 'RUB' }, capture: true,

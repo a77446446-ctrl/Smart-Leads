@@ -1,5 +1,7 @@
 # Развёртывание Smart Leads в Coolify
 
+Для новых клиентских экземпляров используйте [минимальные инфраструктурные переменные и настройку интеграций в админке](owner-setup.md). Большой список ниже остаётся вариантом настройки всех интеграций через Coolify.
+
 Репозиторий GitHub уже содержит `Dockerfile` в корне. В Coolify выбрать сборку **Dockerfile**, ветку `main`, Base Directory `/`, Dockerfile Location `Dockerfile`, Ports Exposes `3000` и постоянный HTTPS-домен. Контейнер слушает `0.0.0.0:3000`; команда запуска сама применяет миграции Prisma и запускает Next.js с внутренним планировщиком.
 
 ## Переменные приложения
@@ -40,6 +42,7 @@ ADMIN_TELEGRAM_IDS=<ВАШ_ЧИСЛОВОЙ_TELEGRAM_ID>
 # Юридические документы: реальные реквизиты оператора.
 LEGAL_DOCUMENT_VERSION=2026-08-23
 LEGAL_EFFECTIVE_DATE=<ДАТА_НАЧАЛА_ДЕЙСТВИЯ>
+LEGAL_OPERATOR_TYPE=SOLE_PROPRIETOR
 LEGAL_OPERATOR_NAME=<ИМЯ_ИЛИ_НАЗВАНИЕ_ОПЕРАТОРА>
 LEGAL_TAX_ID=<ИНН>
 LEGAL_REGISTRATION_ID=<ОГРН_ИЛИ_ОГРНИП>
@@ -80,7 +83,7 @@ NODE_EXTRA_CA_CERTS=/app/certs/russian-trusted-ca-bundle.pem
 ## Настройка платформ после деплоя
 
 1. В BotFather выбрать своего бота → **Login Widget**. Добавить два Allowed URLs: `https://<ВАШ-ДОМЕН>` и `https://<ВАШ-ДОМЕН>/api/auth/telegram/callback`. Скопировать Client ID и Client Secret в переменные выше. Оставить алгоритм подписи `RS256`. После redeploy проверить кнопку Telegram на публичном домене.
-2. Для MAX создать бота, сохранить токен и имя в переменных, а публичный URL приложения добавить в настройках его Mini App. Подписку webhook создать командой `npm run bot:webhook` в терминале запущенного контейнера Coolify. Её адрес — `https://<ВАШ-ДОМЕН>/api/webhooks/max`; вручную вводить webhook URL в env не нужно.
+2. Для MAX создать бота, сохранить токен и имя в переменных или в разделе **Интеграции**, а публичный URL приложения добавить в настройках его Mini App. Подписку webhook можно включить кнопкой **Подключить webhook MAX** в разделе **Интеграции** или командой `npm run bot:webhook` в терминале запущенного контейнера Coolify. Её адрес — `https://<ВАШ-ДОМЕН>/api/webhooks/max`; вручную вводить webhook URL в env не нужно.
    При подключении реальных платежей указать в ЮKassa URL уведомлений `https://<ВАШ-ДОМЕН>/api/webhooks/yookassa`.
 3. В **Persistent Storage** добавить volume с Destination Path `/app/data` — там лежат сессии парсера и данные загрузок. Для базы PostgreSQL настроить отдельное постоянное хранилище и резервное копирование.
 4. В Coolify включить healthcheck `GET /api/health` на порту `3000`; ожидаемый ответ — HTTP 200 и `db: connected`.

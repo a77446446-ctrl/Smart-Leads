@@ -24,3 +24,4 @@ await import('./yookassa-stage-6.test.mjs');
 await import('./lead-presentation.test.mjs');
 await import('./lead-display-regression.test.mjs');
 await import('./branding.test.mjs');
+await import('./instance-config.test.mjs');

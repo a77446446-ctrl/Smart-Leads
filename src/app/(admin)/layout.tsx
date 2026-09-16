@@ -26,6 +26,7 @@ const adminNav = [
   { icon: CreditCard, label: 'Платежи', href: '/admin/payments' },
   { icon: Search, label: 'Детектив', href: '/admin/discovery' },
   { icon: Settings, label: 'Настройки', href: '/admin/settings' },
+  { icon: Settings, label: 'Интеграции', href: '/admin/instance' },
   { icon: Settings, label: 'Бренд', href: '/admin/branding' },
 ];
 
