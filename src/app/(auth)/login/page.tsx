@@ -107,20 +107,29 @@ export default function LoginPage() {
         <Logo className="max-w-sm" />
       </div>
 
-      <div className="flex-1 w-full max-w-sm flex items-center justify-center my-2">
-        <div className="w-full border border-zinc-200 bg-zinc-50 p-8 my-8">
-          <span className="inline-block bg-accent px-3 py-1 text-xs font-bold uppercase">Ваша лента</span>
-          <p className="mt-5 text-2xl font-black leading-tight">{brand.tagline}</p>
-          <p className="mt-4 text-sm leading-relaxed text-zinc-600">{brand.welcomeText}</p>
+      {brand.heroImageUrl ? (
+        <div className="flex w-full max-w-sm flex-1 items-center justify-center py-6">
+          <div className="relative h-[min(52vh,460px)] min-h-[260px] w-full">
+            <Image src={brand.heroImageUrl} alt="Иллюстрация главной страницы" fill unoptimized priority sizes="(max-width: 640px) 100vw, 384px" className="object-contain" />
+          </div>
         </div>
-      </div>
+      ) : (
+        <div className="flex-1 w-full max-w-sm flex items-center justify-center my-2">
+          <div className="w-full border border-zinc-200 bg-zinc-50 p-8 my-8">
+            <span className="inline-block bg-accent px-3 py-1 text-xs font-bold uppercase">Ваша лента</span>
+            <p className="mt-5 text-2xl font-black leading-tight">{brand.tagline}</p>
+            <p className="mt-4 text-sm leading-relaxed text-zinc-600">{brand.welcomeText}</p>
+          </div>
+        </div>
+      )}
 
       <div className="w-full max-w-sm space-y-4 pb-6 relative z-10">
         <div className="bg-white border-2 border-black p-6 space-y-4">
-          <h1 className="text-black font-black text-lg uppercase tracking-tight leading-tight">{brand.name}</h1>
+          <h1 className="text-black font-black text-lg uppercase tracking-tight leading-tight">{brand.heroImageUrl ? brand.tagline : brand.name}</h1>
           <p className="text-[#555] text-sm font-medium leading-relaxed">
             {brand.description}
           </p>
+          {brand.heroImageUrl && brand.welcomeText && <p className="text-[#555] text-sm font-medium leading-relaxed">{brand.welcomeText}</p>}
         </div>
 
         {error && (

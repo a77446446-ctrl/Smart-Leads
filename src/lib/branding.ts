@@ -5,6 +5,7 @@ export type Branding = {
   tagline: string;
   description: string;
   logoUrl: string;
+  heroImageUrl: string;
   accent: string;
   supportEmail: string;
   welcomeText: string;
@@ -15,13 +16,14 @@ export const DEFAULT_BRANDING: Readonly<Branding> = Object.freeze({
   tagline: 'Важное — в одной ленте',
   description: 'Собирайте заявки и новости по интересующим темам. Читайте материалы и получайте уведомления в MAX.',
   logoUrl: '',
+  heroImageUrl: '',
   accent: '#E4FF00',
   supportEmail: '',
   welcomeText: 'Выберите интересующие категории и следите за новыми материалами.',
 });
 
 const limits: Record<keyof Branding, number> = {
-  name: 60, tagline: 120, description: 500, logoUrl: 200,
+  name: 60, tagline: 120, description: 500, logoUrl: 200, heroImageUrl: 200,
   accent: 7, supportEmail: 254, welcomeText: 500,
 };
 
@@ -47,9 +49,11 @@ export function parseBranding(input: unknown): Branding {
   });
   const luminance = channels[0] * 0.2126 + channels[1] * 0.7152 + channels[2] * 0.0722;
   if ((luminance + 0.05) / 0.05 < 4.5) throw new Error('Выберите более светлый акцент: текст кнопок должен оставаться читаемым');
-  // Логотип загружается существующим API с проверкой сигнатуры растрового изображения.
-  if (result.logoUrl && !/^\/api\/uploads\/img_[A-Za-z0-9_-]{1,100}$/.test(result.logoUrl)) {
-    throw new Error('Загрузите логотип через форму: внешние адреса не поддерживаются');
+  // Оба изображения загружаются через API с проверкой сигнатуры файла.
+  for (const key of ['logoUrl', 'heroImageUrl'] as const) {
+    if (result[key] && !/^\/api\/uploads\/img_[A-Za-z0-9_-]{1,100}$/.test(result[key])) {
+      throw new Error('Загрузите изображение через форму: внешние адреса не поддерживаются');
+    }
   }
   if (result.supportEmail && !/^[^\s<>@]+@[^\s<>@]+\.[^\s<>@]+$/.test(result.supportEmail)) throw new Error('Некорректный email поддержки');
   result.accent = result.accent.toUpperCase();

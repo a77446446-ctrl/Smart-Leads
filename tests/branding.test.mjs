@@ -28,12 +28,14 @@ function request(body, origin = 'https://example.org') {
 
 test('настоящие обработчики бренда сохраняют настройки и возвращают их без кэширования', async () => {
   const api = await routeHarness();
-  const response = await api.POST(request({ name: 'Новости дня' }));
+  const response = await api.POST(request({ name: 'Новости дня', heroImageUrl: '/api/uploads/img_main' }));
   assert.equal(response.status, 200);
   assert.equal(api.writes(), 1);
   const read = await api.GET();
   assert.equal(read.headers.get('cache-control'), 'no-store');
-  assert.equal((await read.json()).name, 'Новости дня');
+  const saved = await read.json();
+  assert.equal(saved.name, 'Новости дня');
+  assert.equal(saved.heroImageUrl, '/api/uploads/img_main');
 });
 
 test('отказ авторизации, чужой Origin и опасные настройки не вызывают запись', async () => {
@@ -53,10 +55,12 @@ test('отказ авторизации, чужой Origin и опасные н�
 
 test('пустой экземпляр получает нейтральный бренд; настройки сохраняют произвольное название клиента', () => {
   assert.deepEqual(brandingFromStorage(null), DEFAULT_BRANDING);
-  const brand = parseBranding({ name: ' СтройЛид ', accent: '#aaffdd', logoUrl: '/api/uploads/img_example', supportEmail: 'support@example.org' });
+  const brand = parseBranding({ name: ' СтройЛид ', accent: '#aaffdd', logoUrl: '/api/uploads/img_example', heroImageUrl: '/api/uploads/img_hero', supportEmail: 'support@example.org' });
   assert.equal(brand.name, 'СтройЛид');
   assert.equal(brand.accent, '#AAFFDD');
+  assert.equal(brand.heroImageUrl, '/api/uploads/img_hero');
   assert.deepEqual(brandingFromStorage(JSON.stringify(brand)), brand);
+  assert.equal(brandingFromStorage(JSON.stringify({ name: 'Старый бренд' })).heroImageUrl, '');
 });
 
 test('повреждённая настройка восстанавливается безопасно; секреты и неизвестные поля не принимаются', () => {
@@ -66,9 +70,10 @@ test('повреждённая настройка восстанавливает
   }
 });
 
-test('логотип не допускает внешние ресурсы, исполняемые URL и обход путей', () => {
-  for (const logoUrl of ['javascript:alert(1)', '//evil.example/logo', 'https://evil.example/x', '/api/uploads/../../.env', '/api/uploads/img_a?x=1', 'data:image/svg+xml,evil']) {
-    assert.throws(() => parseBranding({ logoUrl }));
+test('изображения бренда не допускают внешние ресурсы, исполняемые URL и обход путей', () => {
+  for (const imageUrl of ['javascript:alert(1)', '//evil.example/logo', 'https://evil.example/x', '/api/uploads/../../.env', '/api/uploads/img_a?x=1', 'data:image/svg+xml,evil']) {
+    assert.throws(() => parseBranding({ logoUrl: imageUrl }));
+    assert.throws(() => parseBranding({ heroImageUrl: imageUrl }));
   }
 });
 
