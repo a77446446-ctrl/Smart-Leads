@@ -89,3 +89,6 @@ NODE_EXTRA_CA_CERTS=/app/certs/russian-trusted-ca-bundle.pem
 4. В Coolify включить healthcheck `GET /api/health` на порту `3000`; ожидаемый ответ — HTTP 200 и `db: connected`.
 
 После сохранения переменных выполнить **Redeploy**. Если база в отдельном контейнере Coolify, `POSTGRES_HOST` должен быть её внутренним сетевым именем, доступным приложению. Секреты не публиковать в GitHub и не присылать в переписке.
+# Центральная панель и ключ подключения
+
+Клиентская переменная подключения к реестру — `SMART_LEADS_INSTANCE_KEY`; её значение выдаёт центральная панель после создания карточки. Адрес панели — `SMART_LEADS_CONTROL_URL`. Обе переменные задаются только для Runtime. Центральный сайт разворачивается отдельно через `Dockerfile.operator`. Полные шаги и памятка менеджера: [operator-control.md](operator-control.md).
