@@ -1,4 +1,5 @@
 import 'server-only';
+import { getAppOrigin } from '@/lib/app-origin';
 
 import {
   createHash,
@@ -105,27 +106,14 @@ function normalizePhotoUrl(value: unknown): string | null {
 export function getTelegramOidcConfig(): TelegramOidcConfig {
   const clientId = (process.env.TELEGRAM_CLIENT_ID || '').trim();
   const clientSecret = (process.env.TELEGRAM_CLIENT_SECRET || '').trim();
-  const appUrl = (process.env.NEXT_PUBLIC_APP_URL || '').trim().replace(/\/+$/, '');
 
   if (!/^\d+$/.test(clientId)) throw new Error('TELEGRAM_CLIENT_ID не настроен');
   if (clientSecret.length < 16 || clientSecret.length > 512) throw new Error('TELEGRAM_CLIENT_SECRET не настроен');
 
-  let baseUrl: URL;
-  try {
-    baseUrl = new URL(appUrl);
-  } catch {
-    throw new Error('NEXT_PUBLIC_APP_URL не настроен');
-  }
-  const isLocalDevelopment = process.env.NODE_ENV !== 'production'
-    && ['localhost', '127.0.0.1'].includes(baseUrl.hostname);
-  if ((baseUrl.protocol !== 'https:' && !isLocalDevelopment) || baseUrl.username || baseUrl.password || baseUrl.search || baseUrl.hash) {
-    throw new Error('NEXT_PUBLIC_APP_URL должен быть публичным HTTPS-адресом');
-  }
-
   return {
     clientId,
     clientSecret,
-    callbackUrl: `${baseUrl.origin}/api/auth/telegram/callback`,
+    callbackUrl: `${getAppOrigin()}/api/auth/telegram/callback`,
   };
 }
 

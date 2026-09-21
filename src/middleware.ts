@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { getAppOrigin } from '@/lib/app-origin';
 import { sessionCookie, verifySessionToken } from '@/lib/auth/session';
 
 const ADMIN_CRON_PATH = '/api/admin/parser/cron';
@@ -14,7 +15,7 @@ export async function middleware(request: NextRequest) {
   const isApi = request.nextUrl.pathname.startsWith('/api/');
   if (!session) {
     if (isApi) return apiError('Требуется авторизация через MAX', 401);
-    const loginUrl = new URL('/login', request.url);
+    const loginUrl = new URL('/login', getAppOrigin(request.url));
     loginUrl.searchParams.set('next', request.nextUrl.pathname);
     return NextResponse.redirect(loginUrl);
   }
@@ -25,7 +26,7 @@ export async function middleware(request: NextRequest) {
   if (isAdminOnlyPath) {
     if (session.role !== 'ADMIN') {
       if (isApi) return apiError('Недостаточно прав', 403);
-      return NextResponse.redirect(new URL('/dashboard', request.url));
+      return NextResponse.redirect(new URL('/dashboard', getAppOrigin(request.url)));
     }
   }
 

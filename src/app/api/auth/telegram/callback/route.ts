@@ -1,5 +1,6 @@
 import { Prisma } from '@prisma/client';
 import { NextRequest, NextResponse } from 'next/server';
+import { getAppOrigin } from '@/lib/app-origin';
 import { isConfiguredAdminTelegramId } from '@/lib/auth/admin-config';
 import { createSessionToken, sessionCookie, type SessionRole } from '@/lib/auth/session';
 import {
@@ -18,7 +19,7 @@ export const dynamic = 'force-dynamic';
 class BlockedTelegramUserError extends Error {}
 
 function redirectToLogin(request: Request, error: string) {
-  const response = NextResponse.redirect(new URL(`/login?error=${encodeURIComponent(error)}`, request.url));
+  const response = NextResponse.redirect(new URL(`/login?error=${encodeURIComponent(error)}`, getAppOrigin(request.url)));
   response.cookies.set(telegramLoginStateCookie.name, '', {
     ...telegramLoginStateCookie.options,
     maxAge: 0,
@@ -143,7 +144,7 @@ export async function GET(request: NextRequest) {
 
     const role: SessionRole = user.role === 'ADMIN' ? 'ADMIN' : 'USER';
     const token = await createSessionToken(user.id, role);
-    const response = NextResponse.redirect(new URL(role === 'ADMIN' ? '/admin' : '/dashboard', request.url));
+    const response = NextResponse.redirect(new URL(role === 'ADMIN' ? '/admin' : '/dashboard', getAppOrigin(request.url)));
     response.cookies.set(sessionCookie.name, token, {
       ...sessionCookie.options,
       maxAge: sessionCookie.maxAge,
