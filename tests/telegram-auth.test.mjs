@@ -8,7 +8,7 @@ const read = (path) => readFileSync(new URL(`../${path}`, import.meta.url), 'utf
 const originalEnv = { ...process.env };
 
 function loadTelegramAuth() {
-  return loadTs('src/lib/auth/telegram-oidc.ts', { 'server-only': {}, '@/lib/app-origin': loadTs('src/lib/app-origin.ts', {}) });
+  return loadTs('src/lib/auth/telegram-oidc.ts', { 'server-only': {}, '@/lib/app-origin': loadTs('src/lib/app-origin.ts', {}), '@/lib/auth/telegram-http': loadTs('src/lib/auth/telegram-http.ts', { 'server-only': {} }) });
 }
 
 function encode(value) {

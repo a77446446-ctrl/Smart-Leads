@@ -1,5 +1,6 @@
 import 'server-only';
 import { getAppOrigin } from '@/lib/app-origin';
+import { fetchTelegram } from '@/lib/auth/telegram-http';
 
 import {
   createHash,
@@ -178,7 +179,7 @@ export async function exchangeTelegramAuthorizationCode(
   config = getTelegramOidcConfig(),
 ): Promise<string> {
   if (!code || code.length > 2_048) throw new Error('Telegram не передал код авторизации');
-  const response = await fetch(TELEGRAM_TOKEN_ENDPOINT, {
+  const response = await fetchTelegram(TELEGRAM_TOKEN_ENDPOINT, {
     method: 'POST',
     headers: {
       Authorization: `Basic ${Buffer.from(`${config.clientId}:${config.clientSecret}`).toString('base64')}`,
@@ -192,7 +193,6 @@ export async function exchangeTelegramAuthorizationCode(
       code_verifier: verifier,
     }),
     cache: 'no-store',
-    signal: AbortSignal.timeout(10_000),
   });
   const data = await response.json().catch(() => null) as { id_token?: unknown } | null;
   if (!response.ok || typeof data?.id_token !== 'string') throw new Error('Telegram отклонил авторизацию');
@@ -201,9 +201,8 @@ export async function exchangeTelegramAuthorizationCode(
 
 async function loadTelegramJwks(): Promise<TelegramJwks> {
   if (cachedJwks && cachedJwks.expiresAt > Date.now()) return cachedJwks.value;
-  const response = await fetch(TELEGRAM_JWKS_ENDPOINT, {
+  const response = await fetchTelegram(TELEGRAM_JWKS_ENDPOINT, {
     cache: 'no-store',
-    signal: AbortSignal.timeout(10_000),
   });
   const data = await response.json().catch(() => null) as TelegramJwks | null;
   if (!response.ok || !data || !Array.isArray(data.keys) || data.keys.length === 0) {

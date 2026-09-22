@@ -5,6 +5,7 @@ await import('./dev-api-security.test.mjs');
 await import('./api-security.test.mjs');
 await import('./auth-security.test.mjs');
 await import('./telegram-auth.test.mjs');
+await import('./telegram-proxy.test.mjs');
 await import('./user-access-flow.test.mjs');
 await import('./user-management.test.mjs');
 await import('./lead-date.test.mjs');
