@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { adminGuard } from '@/lib/auth/admin-guard';
 import { INSTANCE_FIELDS, publicInstanceConfig, saveInstanceConfig, type InstanceField } from '@/lib/instance-config';
 import { readBoundedJson } from '@/lib/bounded-json';
+import { isSameAppOrigin } from '@/lib/same-app-origin';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -15,7 +16,7 @@ export async function GET() {
 export async function POST(request: Request) {
   const denied = await adminGuard();
   if (denied) return denied;
-  if (request.headers.get('origin') !== new URL(request.url).origin) {
+  if (!isSameAppOrigin(request)) {
     return NextResponse.json({ error: 'Запрос с другого сайта запрещён' }, { status: 403 });
   }
   if (request.headers.get('content-type')?.split(';')[0].trim() !== 'application/json') {

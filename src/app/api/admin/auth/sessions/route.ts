@@ -5,6 +5,7 @@ import {
   decryptProxyUrl,
   ensureParserSessionFile,
   maskProxyUrl,
+  safeParserError,
   sessionFileExists,
   sessionFilePath,
   synchronizeParserSessionFiles,
@@ -25,7 +26,15 @@ export async function GET(req: NextRequest) {
     const accounts = await prisma.maksAccount.findMany({ orderBy: { createdAt: 'desc' } });
     const sessions = await Promise.all(accounts.map(async (account) => {
       const sessionId = account.sessionFile.replace(/\.json$/i, '');
-      const hasSession = await sessionFileExists(sessionId);
+      // После перезапуска контейнера восстанавливаем файл из зашифрованной копии в БД.
+      let hasSession = false;
+      let restorationError: string | null = null;
+      try {
+        hasSession = await sessionFileExists(sessionId) || await ensureParserSessionFile(account);
+      } catch (error) {
+        restorationError = safeParserError(error);
+        console.error(`[SESSIONS] Не удалось восстановить аккаунт ${account.id}:`, restorationError);
+      }
 
       let computedStatus = hasSession ? account.status : 'AUTH_REQUIRED';
       if (computedStatus === 'ACTIVE' && account.cooldownUntil && new Date(account.cooldownUntil) > new Date()) {
@@ -44,7 +53,7 @@ export async function GET(req: NextRequest) {
         consecutiveFailures: account.consecutiveFailures,
         totalRuns: account.totalRuns,
         totalErrors: account.totalErrors,
-        lastError: account.lastError,
+        lastError: restorationError || account.lastError,
         proxy,
       };
     }));

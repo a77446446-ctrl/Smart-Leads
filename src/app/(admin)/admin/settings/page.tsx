@@ -95,6 +95,9 @@ export default function SettingsPage() {
   const [newChat, setNewChat] = useState('');
   const [parsingChats, setParsingChats] = useState<Chat[]>([]);
   const [status, setStatus] = useState<'idle' | 'success' | 'error'>('idle');
+  const [saveError, setSaveError] = useState('');
+  const [loadError, setLoadError] = useState('');
+  const [settingsLoaded, setSettingsLoaded] = useState(false);
   const [showHelp, setShowHelp] = useState(false);
   const [authorizing, setAuthorizing] = useState(false);
   const [sessions, setSessions] = useState<MaksSession[]>([]);
@@ -211,7 +214,6 @@ export default function SettingsPage() {
   useEffect(() => {
     if (!proxyLoaded) return;
     setProxyStatus('idle');
-    setCanBypass(false);
   }, [proxyProtocol, proxyIP, proxyPort, proxyUser, proxyPass, proxyLoaded]);
 
   useEffect(() => {
@@ -230,8 +232,11 @@ export default function SettingsPage() {
 
   const fetchSettings = async (silent = false) => {
     try {
-      const res = await fetch('/api/admin/settings');
+      const res = await fetch('/api/admin/settings', { cache: 'no-store' });
+      if (!res.ok) throw new Error(`Сервер вернул ${res.status}`);
       const data: Setting[] = await res.json();
+      if (!Array.isArray(data)) throw new Error('Сервер не вернул настройки');
+      if (!silent) { setSettingsLoaded(true); setLoadError(''); }
       const settingsMap: Record<string, string> = {};
       data.forEach(s => settingsMap[s.key] = s.value);
       
@@ -324,6 +329,7 @@ export default function SettingsPage() {
       setParseTimeStart(settingsMap['maks_parser_time_start'] || '08:00');
       setParseTimeEnd(settingsMap['maks_parser_time_end'] || '23:00');
       setParseTimeEnabled(settingsMap['maks_parser_time_enabled'] !== 'false');
+      setCanBypass(settingsMap['maks_connection_mode'] === 'direct');
       
       if (!silent && settingsMap['sync_logs']) {
         lastSyncLogsRef.current = settingsMap['sync_logs'];
@@ -361,7 +367,10 @@ export default function SettingsPage() {
           }).catch(console.error);
           setNextRunSeconds(Math.max(interval, 60));
       }
-    } catch (error) { console.error('Failed to fetch settings:', error); }
+    } catch (error) {
+      console.error('Failed to fetch settings:', error);
+      if (!silent) setLoadError('Не удалось загрузить настройки. Обновите страницу и проверьте доступность базы данных.');
+    }
     finally { if (!silent) setLoading(false); }
   };
 
@@ -418,6 +427,7 @@ export default function SettingsPage() {
   const handleSave = async () => {
     setSaving(true);
     setStatus('idle');
+    setSaveError('');
     try {
       const saveKey = async (key: string, value: string) => {
         const res = await fetch('/api/admin/settings', {
@@ -440,9 +450,12 @@ export default function SettingsPage() {
       await saveKey('maks_welcome_bonus_amount', settings['maks_welcome_bonus_amount'] || '300');
       await saveKey('maks_parsing_chats', JSON.stringify(parsingChats));
       await saveKey('maks_parser_auto', autoParseEnabled ? 'true' : 'false');
+      await saveKey('maks_parser_interval', String(parseInterval));
+      await saveKey('lead_retention_days', String(leadRetentionDays));
       await saveKey('maks_parser_time_start', parseTimeStart);
       await saveKey('maks_parser_time_end', parseTimeEnd);
       await saveKey('maks_parser_time_enabled', parseTimeEnabled ? 'true' : 'false');
+      await saveKey('maks_connection_mode', canBypass ? 'direct' : 'proxy');
 
       if (!canBypass && (proxyIP || proxyPort || proxyUser || proxyPass)) {
         await persistProxyDraft();
@@ -450,13 +463,12 @@ export default function SettingsPage() {
       setStatus('success');
       setHasUnsavedChanges(false);
       setTimeout(() => setStatus('idle'), 3000);
-      // 2. Sync accounts from files to DB
-      await fetch('/api/admin/auth/sessions');
-      
-      addLog('Настройки и аккаунты сохранены', 'success');
+      addLog('Настройки и чаты сохранены', 'success');
     } catch (error) { 
       setStatus('error'); 
-      addLog(`Ошибка сохранения: ${error instanceof Error ? error.message : String(error)}`, 'error');
+      const message = error instanceof Error ? error.message : String(error);
+      setSaveError(message);
+      addLog(`Ошибка сохранения: ${message}`, 'error');
     } finally { setSaving(false); }
   };
 
@@ -590,28 +602,9 @@ export default function SettingsPage() {
     }
   };
 
-  const saveAutoParseSettings = async (enabled: boolean, interval?: number) => {
-    try {
-      await fetch('/api/admin/settings', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ key: 'maks_parser_auto', value: enabled ? 'true' : 'false' }),
-      });
-      if (interval !== undefined) {
-        await fetch('/api/admin/settings', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ key: 'maks_parser_interval', value: String(interval) }),
-        });
-      }
-    } catch (e) {
-      console.error('Failed to save parser settings:', e);
-    }
-  };
-
   const handleAutoParseToggle = (enabled: boolean) => {
     setAutoParseEnabled(enabled);
-    saveAutoParseSettings(enabled, parseInterval);
+    setHasUnsavedChanges(true);
     if (enabled) {
       setNextRunSeconds(parseInterval);
     } else {
@@ -620,26 +613,16 @@ export default function SettingsPage() {
     addLog(enabled ? 'Авто-парсинг включен' : 'Авто-парсинг отключен', 'info');
   };
 
-  const handleRetentionDaysChange = async (days: number) => {
+  const handleRetentionDaysChange = (days: number) => {
     setLeadRetentionDays(days);
-    try {
-      await fetch('/api/admin/settings', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ key: 'lead_retention_days', value: String(days) }),
-      });
-      addLog(`Срок хранения лидов изменен на ${days} дн.`, 'info');
-    } catch (e) {
-      console.error('Failed to save retention days:', e);
-    }
+    setHasUnsavedChanges(true);
+    addLog(`Срок хранения лидов изменен на ${days} дн.`, 'info');
   };
 
   const handleIntervalChange = (newInterval: number) => {
     setParseInterval(newInterval);
-    if (autoParseEnabled) {
-      saveAutoParseSettings(true, newInterval);
-      addLog(`Интервал парсинга: ${newInterval / 60} мин.`, 'info');
-    }
+    setHasUnsavedChanges(true);
+    addLog(`Интервал парсинга: ${newInterval / 60} мин.`, 'info');
   };
 
   const addLog = (msg: string, type: 'info' | 'success' | 'error' = 'info') => {
@@ -853,9 +836,9 @@ export default function SettingsPage() {
           
           <button 
             onClick={handleSave} 
-            disabled={saving || !hasUnsavedChanges} 
+            disabled={saving || !settingsLoaded || !hasUnsavedChanges}
             className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[9px] font-bold uppercase tracking-widest transition-all sm:ml-4 border ${
-              saving || !hasUnsavedChanges
+              saving || !settingsLoaded || !hasUnsavedChanges
                 ? 'bg-zinc-900 border-zinc-800 text-zinc-500 cursor-not-allowed opacity-70'
                 : 'bg-zinc-950 border-zinc-700 text-accent hover:bg-zinc-800'
             }`}
@@ -873,6 +856,9 @@ export default function SettingsPage() {
           </div>
         </button>
       </div>
+      {loadError && <p role="alert" className="mx-4 mt-4 rounded-lg border border-red-700 bg-red-950 p-3 text-sm text-red-100 sm:mx-6">{loadError}</p>}
+      {status === 'error' && <p role="alert" className="mx-4 mt-4 rounded-lg border border-red-700 bg-red-950 p-3 text-sm text-red-100 sm:mx-6">{saveError}</p>}
+      {status === 'success' && <p role="status" className="mx-4 mt-4 rounded-lg border border-green-700 bg-green-950 p-3 text-sm text-green-100 sm:mx-6">Настройки и чаты сохранены.</p>}
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 sm:p-6 rounded-xl items-stretch">
         {/* ACCOUNTS CARD */}
@@ -891,6 +877,7 @@ export default function SettingsPage() {
                       onClick={() => {
                         setCanBypass(false);
                         setProxyStatus('idle');
+                        setHasUnsavedChanges(true);
                       }} // Reset status when switching
                       className={cn(
                         "px-4 py-1.5 text-[9px] font-bold uppercase transition-all border border-transparent rounded-md",
@@ -904,9 +891,8 @@ export default function SettingsPage() {
                       disabled={proxyBusy || authorizing}
                       onClick={() => {
                         setCanBypass(true);
+                        setHasUnsavedChanges(true);
                         setProxyStatus('idle');
-                        setProxyIP('');
-                        setProxyPort('');
                       }}
                       className={cn(
                         "px-4 py-1.5 text-[9px] font-bold uppercase transition-all border border-transparent rounded-md",
@@ -927,7 +913,7 @@ export default function SettingsPage() {
                        <select 
                           disabled={proxyBusy || authorizing}
                           value={proxyProtocol}
-                          onChange={(e) => setProxyProtocol(e.target.value as any)}
+                          onChange={(e) => { setProxyProtocol(e.target.value as 'http://' | 'socks5://'); setHasUnsavedChanges(true); }}
                           className="bg-zinc-950 border border-zinc-700 rounded-lg py-1.5 px-3 text-[9px] font-bold text-white uppercase focus:ring-1 focus:ring-black appearance-none cursor-pointer outline-none"
                        >
                           <option value="http://">HTTP</option>
@@ -939,19 +925,19 @@ export default function SettingsPage() {
                  <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                     <div className="relative">
                        <Server className="absolute left-4 top-1/2 -translate-y-1/2 text-zinc-500" size={12} />
-                       <input disabled={proxyBusy || authorizing} value={proxyIP} onChange={(e) => setProxyIP(e.target.value)} placeholder="IP Адрес" className={inputClasses} />
+                       <input disabled={proxyBusy || authorizing} value={proxyIP} onChange={(e) => { setProxyIP(e.target.value); setHasUnsavedChanges(true); }} placeholder="IP Адрес" className={inputClasses} />
                     </div>
                     <div className="relative">
                        <Hash className="absolute left-4 top-1/2 -translate-y-1/2 text-zinc-500" size={12} />
-                       <input disabled={proxyBusy || authorizing} value={proxyPort} onChange={(e) => setProxyPort(e.target.value)} placeholder="Порт" className={inputClasses} />
+                       <input disabled={proxyBusy || authorizing} value={proxyPort} onChange={(e) => { setProxyPort(e.target.value); setHasUnsavedChanges(true); }} placeholder="Порт" className={inputClasses} />
                     </div>
                     <div className="relative">
                        <UserCircle className="absolute left-4 top-1/2 -translate-y-1/2 text-zinc-500" size={12} />
-                       <input disabled={proxyBusy || authorizing} value={proxyUser} onChange={(e) => setProxyUser(e.target.value)} placeholder="Логин" className={inputClasses} />
+                       <input disabled={proxyBusy || authorizing} value={proxyUser} onChange={(e) => { setProxyUser(e.target.value); setHasUnsavedChanges(true); }} placeholder="Логин" className={inputClasses} />
                     </div>
                     <div className="relative">
                        <Lock className="absolute left-4 top-1/2 -translate-y-1/2 text-zinc-500" size={12} />
-                       <input disabled={proxyBusy || authorizing} type={showPass ? 'text' : 'password'} value={proxyPass} onChange={(e) => setProxyPass(e.target.value)} placeholder={hasSavedProxyPassword && proxyIdentity() === savedProxyIdentity ? '••••••••' : 'Пароль'} className={cn(inputClasses, "pr-10")} />
+                       <input disabled={proxyBusy || authorizing} type={showPass ? 'text' : 'password'} value={proxyPass} onChange={(e) => { setProxyPass(e.target.value); setHasUnsavedChanges(true); }} placeholder={hasSavedProxyPassword && proxyIdentity() === savedProxyIdentity ? '••••••••' : 'Пароль'} className={cn(inputClasses, "pr-10")} />
                        <button onClick={() => setShowPass(!showPass)} className="absolute right-4 top-1/2 -translate-y-1/2 text-zinc-500 hover:text-white transition-colors">
                           {showPass ? <EyeOff size={12} /> : <Eye size={12} />}
                        </button>

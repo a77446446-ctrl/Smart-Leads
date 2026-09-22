@@ -5,17 +5,19 @@ import { stripTypeScriptTypes } from 'node:module';
 import { DEFAULT_BRANDING, parseBranding, brandingFromStorage } from '../src/lib/branding.ts';
 import { readBoundedJson } from '../src/lib/bounded-json.ts';
 import { BRANDING_SETTING_KEY } from '../src/lib/branding.ts';
+import { loadTs } from './helpers/load-ts.mjs';
 
 async function routeHarness(denied = null) {
   const source = await readFile(new URL('../src/app/api/admin/branding/route.ts', import.meta.url), 'utf8');
   const executable = stripTypeScriptTypes(source).replace(/^import .*;\r?\n/gm, '').replace(/^export /gm, '');
   let stored = null;
   let writes = 0;
-  const handlers = new Function('NextResponse', 'adminGuard', 'prisma', 'BRANDING_SETTING_KEY', 'parseBranding', 'getBranding', 'readBoundedJson', executable + '\nreturn { GET, POST };')(
+  const handlers = new Function('NextResponse', 'adminGuard', 'prisma', 'BRANDING_SETTING_KEY', 'parseBranding', 'getBranding', 'readBoundedJson', 'isSameAppOrigin', executable + '\nreturn { GET, POST };')(
     { json: (body, init) => Response.json(body, init) },
     async () => denied,
     { setting: { upsert: async args => { assert.equal(args.where.key, BRANDING_SETTING_KEY); stored = args.update.value; writes++; } } },
     BRANDING_SETTING_KEY, parseBranding, async () => brandingFromStorage(stored), readBoundedJson,
+    request => request.headers.get('origin') === 'https://example.org',
   );
   return { ...handlers, writes: () => writes };
 }
@@ -25,6 +27,26 @@ function request(body, origin = 'https://example.org') {
     method: 'POST', headers: { 'Content-Type': 'application/json', Origin: origin }, body: JSON.stringify(body),
   });
 }
+
+test('публичный Origin проходит за внутренним URL прокси, чужой и пустой блокируются', () => {
+  const appOrigin = loadTs('src/lib/app-origin.ts', {});
+  const { isSameAppOrigin } = loadTs('src/lib/same-app-origin.ts', { '@/lib/app-origin': appOrigin });
+  const previousUrl = process.env.NEXT_PUBLIC_APP_URL;
+  const previousMode = process.env.NODE_ENV;
+  try {
+    process.env.NODE_ENV = 'production';
+    process.env.NEXT_PUBLIC_APP_URL = 'https://client.example.org';
+    const internal = 'http://localhost:3000/api/admin/branding';
+    assert.equal(isSameAppOrigin(new Request(internal, { headers: { Origin: 'https://client.example.org' } })), true);
+    assert.equal(isSameAppOrigin(new Request(internal, { headers: { Origin: 'https://evil.example.org' } })), false);
+    assert.equal(isSameAppOrigin(new Request(internal)), false);
+  } finally {
+    if (previousUrl === undefined) delete process.env.NEXT_PUBLIC_APP_URL;
+    else process.env.NEXT_PUBLIC_APP_URL = previousUrl;
+    if (previousMode === undefined) delete process.env.NODE_ENV;
+    else process.env.NODE_ENV = previousMode;
+  }
+});
 
 test('настоящие обработчики бренда сохраняют настройки и возвращают их без кэширования', async () => {
   const api = await routeHarness();
@@ -49,7 +71,7 @@ test('отказ авторизации, чужой Origin и опасные н�
   assert.equal((await api.POST(request({ name: 'Подмена' }, 'https://evil.example'))).status, 403);
   assert.equal((await api.POST(request({ logoUrl: '//evil.example' }))).status, 400);
   assert.equal((await api.POST(request({ name: 'я'.repeat(9000) }))).status, 413);
-  assert.equal((await api.POST(new Request('https://example.org', { method: 'POST', body: '{}' }))).status, 415);
+  assert.equal((await api.POST(new Request('https://example.org', { method: 'POST', headers: { Origin: 'https://example.org' }, body: '{}' }))).status, 415);
   assert.equal(api.writes(), 0);
 });
 

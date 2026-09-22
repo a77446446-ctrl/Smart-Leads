@@ -19,7 +19,7 @@ export async function GET() {
     displaySettings.push({ id: 'runtime-active-target-chats', key: 'maks_active_target_chats', value: JSON.stringify(activeTargetChats) });
     return NextResponse.json(displaySettings.map((setting) =>
       isSecretSettingKey(setting.key) ? { ...setting, value: SECRET_MASK } : setting,
-    ));
+    ), { headers: { 'Cache-Control': 'no-store' } });
   } catch (error) {
     console.error('Error fetching settings:', error);
     return NextResponse.json({ error: 'Failed to fetch settings' }, { status: 500 });
