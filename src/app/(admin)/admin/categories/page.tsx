@@ -20,6 +20,8 @@ import {
   ImageIcon
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { ApplicationThemeSettings } from '@/components/ApplicationThemeSettings';
+import { APPLICATION_THEMES, ApplicationThemeId } from '@/lib/application-theme';
 
 interface Category {
   id: string;
@@ -61,6 +63,7 @@ const initialFormData = {
 };
 
 export default function AdminCategoriesPage() {
+  const [applicationTheme, setApplicationTheme] = useState<ApplicationThemeId | null>(null);
   const [categories, setCategories] = useState<Category[]>([]);
   const [loading, setLoading] = useState(true);
   const [editingId, setEditingId] = useState<string | null>(null);
@@ -331,7 +334,9 @@ export default function AdminCategoriesPage() {
         </div>
       </div>
 
-      {/* EDIT/ADD FORM */}
+      <ApplicationThemeSettings onSaved={setApplicationTheme} />
+
+      {/* Форма категории выбранной темы. */}
       <div className="flex flex-col rounded-xl border border-zinc-700 bg-zinc-900 overflow-hidden shadow-lg">
         <div className="flex items-center gap-3 p-4 sm:p-6 border-b border-zinc-800 relative overflow-hidden">
           <div className="absolute top-0 right-0 p-4 opacity-5 pointer-events-none">
@@ -349,11 +354,11 @@ export default function AdminCategoriesPage() {
 
         <div className="grid grid-cols-1 md:grid-cols-12 gap-4 sm:p-6">
            <div className="space-y-3 md:col-span-4">
-            <label className="text-[9px] font-bold text-zinc-500 uppercase tracking-widest ml-1">Название услуги (для ИИ)</label>
+            <label className="text-[9px] font-bold text-zinc-500 uppercase tracking-widest ml-1">Название категории</label>
             <input 
               value={formData.name} 
               onChange={e => setFormData({...formData, name: e.target.value})}
-              placeholder="Например: Мастер на час" 
+              placeholder={`Например: ${APPLICATION_THEMES.find(theme => theme.id === applicationTheme)?.example ?? 'Ремонт квартир'}`}
               className="w-full bg-zinc-950 border border-zinc-700 rounded-lg py-3 px-4 text-xs sm:text-sm font-bold focus:border-accent outline-none transition-all placeholder:text-zinc-600 text-white" 
             />
           </div>

@@ -24,6 +24,7 @@ test('сохранённые настройки и чат загружаются
     '@/lib/prisma': { prisma },
     '@/lib/security/secret-mask': { isSecretSettingKey: () => false, SECRET_MASK: '••••' },
     '@/lib/instance-config': { isInstanceSettingKey: () => false },
+    '@/lib/application-theme': loadTs('src/lib/application-theme.ts', {}),
   });
   const chat = [{ name: 'Рабочий чат', url: 'https://web.max.ru/a/#@example', parseAll: true }];
   for (const [key, value] of Object.entries({ maks_parsing_chats: JSON.stringify(chat), maks_parser_auto: 'true', maks_parser_interval: '300' })) {

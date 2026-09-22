@@ -3,6 +3,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { isSecretSettingKey, SECRET_MASK } from '@/lib/security/secret-mask';
 import { isInstanceSettingKey } from '@/lib/instance-config';
+import { APPLICATION_THEME_SETTING_KEY } from '@/lib/application-theme';
 
 export const dynamic = 'force-dynamic';
 
@@ -15,7 +16,7 @@ export async function GET() {
       where: { active: true, status: 'ACTIVE' },
       select: { url: true, parseAll: true },
     });
-    const displaySettings = settings.filter((setting) => setting.key !== 'maks_active_target_chats' && !isInstanceSettingKey(setting.key));
+    const displaySettings = settings.filter((setting) => setting.key !== 'maks_active_target_chats' && setting.key !== APPLICATION_THEME_SETTING_KEY && !isInstanceSettingKey(setting.key));
     displaySettings.push({ id: 'runtime-active-target-chats', key: 'maks_active_target_chats', value: JSON.stringify(activeTargetChats) });
     return NextResponse.json(displaySettings.map((setting) =>
       isSecretSettingKey(setting.key) ? { ...setting, value: SECRET_MASK } : setting,
@@ -37,7 +38,7 @@ export async function POST(req: NextRequest) {
     const body = parsedBody as Record<string, unknown>;
     const key = typeof body.key === 'string' ? body.key.trim() : '';
     const value = String(body.value ?? '');
-    if (!/^[a-z0-9_]{1,100}$/.test(key) || isInstanceSettingKey(key) || value.length > 100_000) {
+    if (!/^[a-z0-9_]{1,100}$/.test(key) || key === APPLICATION_THEME_SETTING_KEY || isInstanceSettingKey(key) || value.length > 100_000) {
       return NextResponse.json({ error: 'Некорректная настройка' }, { status: 400 });
     }
     if (isSecretSettingKey(key) && value === SECRET_MASK) {
