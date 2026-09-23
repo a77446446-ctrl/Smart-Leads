@@ -25,7 +25,7 @@ async function harness({ theme = 'news', categories = rules, aiFails = false, se
   const prisma = {
     parserSeenMessage: { findUnique: async () => seen ? { fingerprint: 'seen' } : null },
     setting: { findUnique: async () => { if (settingFails) throw new Error('Ошибка настроек'); return theme === null ? null : { value: theme }; } },
-    category: { findMany: async () => categories.filter(c => c.active), upsert: async () => ({ id: 'other', slug: 'other', leadPrice: 50 }) },
+    category: { findMany: async () => categories.filter(c => c.active), upsert: async () => categories.find(c => c.slug === 'other') ?? ({ id: 'other', slug: 'other', leadPrice: 50 }) },
     lead: { findFirst: async ({ where }) => saved.find(row => where.OR.some(condition => Object.entries(condition).every(([key, value]) => row[key] === value))) ?? null, create: insert },
   };
   const processor = loadTs('src/services/themed-message-processor.ts', {
@@ -131,6 +131,17 @@ test('фотографии следуют настройке категории;
   const paid = await harness({ theme: 'orders' });
   await paid.run('Футбол контакт +79991234567');
   assert.equal(paid.saved[0].expiresAt, null);
+});
+
+test('повторный разбор дополняет существующую новость фотографией из категории Другое', async () => {
+  const other = { id: 'other', slug: 'other', name: 'Другое', active: true, plusKeywords: '', minusKeywords: '', leadPrice: 0, capturePhotos: true };
+  const h = await harness({ categories: [...rules, other] });
+  assert.equal(await h.run('Внимание родителям!', true), true);
+  assert.equal(h.saved[0].categoryId, 'other');
+  const photos = [{ key: 'photo', mimeType: 'image/jpeg' }];
+  assert.equal(await h.run('Внимание родителям!', true, '1', photos), false);
+  assert.equal(h.saved.length, 1);
+  assert.deepEqual(h.attachments.at(-1), { id: h.saved[0].id, photos });
 });
 
 test('сбой фотографии сохраняет текст, отклонение убирает временные файлы, удалённая новость не воскресает', async () => {

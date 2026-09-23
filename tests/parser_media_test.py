@@ -72,6 +72,27 @@ class PhotoTests(unittest.TestCase):
             self.assertEqual(result, [["blob:https://max.ru/auto"], ["blob:https://max.ru/sport"], []])
             browser.close()
 
+    def test_dom_finds_photo_above_text_without_message_id(self):
+        from playwright.sync_api import sync_playwright
+        with sync_playwright() as playwright:
+            browser = playwright.chromium.launch(headless=True)
+            page = browser.new_page()
+            page.set_content('''<style>.messageItem {margin-left:300px;width:400px}
+              img {width:300px;height:160px}</style>
+              <div class="messageItem"><div class="PhotoPreview"><img id="news"></div>
+                <div class="messageText">Внимание родителям!</div>
+                <div class="avatar"><img id="avatar"></div></div>
+              <div class="messageItem"><div class="PhotoPreview"><img id="neighbour"></div>
+                <div class="messageText">Другая новость</div></div>''')
+            page.evaluate('''() => { for (const img of document.querySelectorAll('img')) {
+              Object.defineProperty(img, 'naturalWidth', {value:300});
+              Object.defineProperty(img, 'naturalHeight', {value:160});
+              Object.defineProperty(img, 'currentSrc', {value:'blob:https://max.ru/' + img.id});
+            } }''')
+            result = page.evaluate(DOM_SCRIPT, [{"text": "Внимание родителям!"}, {"text": "Другая новость"}])
+            self.assertEqual(result, [["blob:https://max.ru/news"], ["blob:https://max.ru/neighbour"]])
+            browser.close()
+
 
 if __name__ == "__main__":
     unittest.main()
