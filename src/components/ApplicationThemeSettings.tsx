@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import { ChevronDown } from 'lucide-react';
 import { APPLICATION_THEMES, ApplicationThemeId, isApplicationThemeId } from '@/lib/application-theme';
 
 export function ApplicationThemeSettings({ onSaved }: { onSaved: (theme: ApplicationThemeId | null) => void }) {
@@ -71,12 +72,15 @@ export function ApplicationThemeSettings({ onSaved }: { onSaved: (theme: Applica
       <div className="flex flex-col sm:flex-row gap-3">
         <div className="flex-1 space-y-2">
           <label htmlFor="application-theme" className="text-sm text-zinc-300">Одна тема приложения</label>
-          <select id="application-theme" value={selected} disabled={!loaded || busy}
-            onChange={event => { if (isApplicationThemeId(event.target.value)) setSelected(event.target.value); setMessage(''); }}
-            className="w-full rounded-lg border border-zinc-700 bg-zinc-950 p-3 text-sm text-white disabled:opacity-50">
-            <option value="" disabled>Выберите тему</option>
-            {APPLICATION_THEMES.map(theme => <option key={theme.id} value={theme.id}>{theme.name}</option>)}
-          </select>
+          <div className="relative">
+            <select id="application-theme" value={selected} disabled={!loaded || busy}
+              onChange={event => { if (isApplicationThemeId(event.target.value)) setSelected(event.target.value); setMessage(''); }}
+              className="w-full appearance-none rounded-lg border border-zinc-700 bg-zinc-950 py-3 pl-3 pr-12 text-sm text-white disabled:opacity-50">
+              <option value="" disabled>Выберите тему</option>
+              {APPLICATION_THEMES.map(theme => <option key={theme.id} value={theme.id}>{theme.name}</option>)}
+            </select>
+            <ChevronDown aria-hidden="true" size={14} className="pointer-events-none absolute right-4 top-1/2 -translate-y-1/2 text-zinc-500" />
+          </div>
         </div>
         <button type="button" onClick={() => void save()} disabled={!loaded || busy || !selected || selected === saved}
           className="self-start sm:self-end rounded-lg bg-accent px-5 py-3 text-sm font-bold text-black disabled:opacity-50">

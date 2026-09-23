@@ -41,6 +41,7 @@ interface Category {
   showcaseChatId?: string | null;
   showcaseEnabled: boolean;
   showcaseKind: 'PUBLIC' | 'PRIVATE';
+  capturePhotos: boolean;
 }
 
 interface MaxBotChat {
@@ -117,7 +118,7 @@ export default function AdminCategoriesPage() {
 
   const fetchCategories = async () => {
     try {
-      const res = await fetch('/api/admin/category');
+      const res = await fetch('/api/admin/category', { cache: 'no-store' });
       const data = await res.json();
       const categories = Array.isArray(data) ? data.map(cat => ({
         ...cat,
@@ -465,34 +466,40 @@ export default function AdminCategoriesPage() {
           </label>
           <div className="md:col-span-6 space-y-2">
             <label className="text-[9px] font-bold text-zinc-500 uppercase tracking-widest">Канал для публикации лидов</label>
-            <select
-              value={formData.showcaseChatId || ''}
-              onChange={(event) => setFormData({ ...formData, showcaseChatId: event.target.value })}
-              disabled={!formData.showcaseEnabled}
-              className="w-full bg-zinc-900 border border-zinc-700 rounded-lg py-3 px-4 text-xs sm:text-sm font-bold text-white disabled:opacity-40"
-            >
-              <option value="">Выберите подключённый MAX-канал</option>
-              {maxBotChats.filter((chat) => chat.active).map((chat) => (
-                <option key={chat.chatId} value={chat.chatId}>
-                  {chat.title || `${chat.kind} ${chat.chatId}`}
-                </option>
-              ))}
-              {formData.showcaseChatId && !maxBotChats.some((chat) => chat.chatId === formData.showcaseChatId) && (
-                <option value={formData.showcaseChatId}>Текущий chat_id: {formData.showcaseChatId}</option>
-              )}
-            </select>
+            <div className="relative">
+              <select
+                value={formData.showcaseChatId || ''}
+                onChange={(event) => setFormData({ ...formData, showcaseChatId: event.target.value })}
+                disabled={!formData.showcaseEnabled}
+                className="w-full appearance-none bg-zinc-900 border border-zinc-700 rounded-lg py-3 pl-4 pr-12 text-xs sm:text-sm font-bold text-white disabled:opacity-40"
+              >
+                <option value="">Выберите подключённый MAX-канал</option>
+                {maxBotChats.filter((chat) => chat.active).map((chat) => (
+                  <option key={chat.chatId} value={chat.chatId}>
+                    {chat.title || `${chat.kind} ${chat.chatId}`}
+                  </option>
+                ))}
+                {formData.showcaseChatId && !maxBotChats.some((chat) => chat.chatId === formData.showcaseChatId) && (
+                  <option value={formData.showcaseChatId}>Текущий chat_id: {formData.showcaseChatId}</option>
+                )}
+              </select>
+              <ChevronDown aria-hidden="true" size={14} className="pointer-events-none absolute right-4 top-1/2 -translate-y-1/2 text-zinc-500" />
+            </div>
           </div>
           <div className="md:col-span-3 space-y-2">
             <label className="text-[9px] font-bold text-zinc-500 uppercase tracking-widest">Тип витрины</label>
-            <select
-              value={formData.showcaseKind || 'PUBLIC'}
-              onChange={(event) => setFormData({ ...formData, showcaseKind: event.target.value as 'PUBLIC' | 'PRIVATE' })}
-              disabled={!formData.showcaseEnabled}
-              className="w-full bg-zinc-900 border border-zinc-700 rounded-lg py-3 px-4 text-xs sm:text-sm font-bold text-white disabled:opacity-40"
-            >
-              <option value="PUBLIC">ПУБЛИЧНАЯ</option>
-              <option value="PRIVATE">ПРИВАТНАЯ</option>
-            </select>
+            <div className="relative">
+              <select
+                value={formData.showcaseKind || 'PUBLIC'}
+                onChange={(event) => setFormData({ ...formData, showcaseKind: event.target.value as 'PUBLIC' | 'PRIVATE' })}
+                disabled={!formData.showcaseEnabled}
+                className="w-full appearance-none bg-zinc-900 border border-zinc-700 rounded-lg py-3 pl-4 pr-12 text-xs sm:text-sm font-bold text-white disabled:opacity-40"
+              >
+                <option value="PUBLIC">ПУБЛИЧНАЯ</option>
+                <option value="PRIVATE">ПРИВАТНАЯ</option>
+              </select>
+              <ChevronDown aria-hidden="true" size={14} className="pointer-events-none absolute right-4 top-1/2 -translate-y-1/2 text-zinc-500" />
+            </div>
           </div>
           <div className="md:col-span-12 space-y-2 border-t border-zinc-800 pt-4">
             <label className="text-[9px] font-bold text-zinc-500 uppercase tracking-widest">Обнаружить MAX-канал</label>
