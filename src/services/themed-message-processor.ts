@@ -1,4 +1,6 @@
 import type { Prisma } from '@prisma/client';
+import { publicationExpiresAt, type PhotoMessage } from '@/lib/lead-media';
+import { attachLeadPhotos, discardStagedPhotos } from './lead-media';
 import { prisma } from '@/lib/prisma';
 import { APPLICATION_THEME_SETTING_KEY, isApplicationThemeId } from '@/lib/application-theme';
 import { classifyLeadCategory } from '@/lib/lead-category';
@@ -13,7 +15,7 @@ import { aiService } from './ai';
 import { createLeadWithDeliveries } from './bot-outbox';
 
 type LogEntry = { time: string; msg: string; type: 'info' | 'success' | 'error' };
-type MessageProcessor = (message: { text: string; id?: string }, chatUrl: string, chatTitle: string, parseAll: boolean, logs: LogEntry[]) => Promise<boolean>;
+type MessageProcessor = (message: PhotoMessage, chatUrl: string, chatTitle: string, parseAll: boolean, logs: LogEntry[]) => Promise<boolean>;
 
 function log(logs: LogEntry[], msg: string, type: LogEntry['type'] = 'info') {
   if (logs.length < 500) logs.push({ time: new Date().toLocaleTimeString('ru-RU', { timeZone: 'Europe/Moscow' }), msg: msg.slice(0, 500), type });
@@ -34,7 +36,15 @@ export async function selectMessageProcessor(legacy: MessageProcessor): Promise<
       if (isTechnicalParserMessage(original)) return false;
       const fingerprint = buildParserMessageFingerprint(chatUrl, message.id, original);
       const contentFingerprint = buildLeadContentFingerprint({ rawText: original });
-      if (await prisma.lead.findFirst({ where: { OR: [{ fingerprint }, { contentFingerprint }, { rawText: original, sourceChat: chatUrl }] }, select: { id: true } })) return false;
+      if (publicAccess && await prisma.parserSeenMessage.findUnique({ where: { fingerprint } })) return false;
+      const existing = await prisma.lead.findFirst({ where: { OR: [{ fingerprint }, { contentFingerprint }, { rawText: original, sourceChat: chatUrl }] }, select: { id: true, categoryId: true, sourceChat: true, expiresAt: true } });
+      if (existing) {
+        if (existing.sourceChat === chatUrl && (!existing.expiresAt || existing.expiresAt.getTime() > Date.now()) && categories.some(category => category.id === existing.categoryId && category.capturePhotos)) {
+          try { await attachLeadPhotos(existing.id, message); }
+          catch { log(logs, 'Не удалось дополнить существующее сообщение фотографиями', 'error'); }
+        }
+        return false;
+      }
 
       const match = classifyLeadCategory(original, categories);
       if (!parseAll && !match.matched) {
@@ -65,20 +75,29 @@ export async function selectMessageProcessor(legacy: MessageProcessor): Promise<
         categoryId: category.id, sourceChat: chatUrl, fingerprint, contentFingerprint,
         allowContactless: publicAccess || parseAll, publicationTheme: theme,
         accessMode: publicAccess ? 'PUBLIC' : 'CONTACT', price: publicAccess ? 0 : category.leadPrice,
+        expiresAt: publicAccess ? publicationExpiresAt(category.ttlMinutes) : null,
         score: publicAccess || parseAll ? 100 : Math.min(100, Math.max(0, metadata?.score || 50)), status: 'NEW',
       };
+      let lead: { id: string };
       if (publicAccess) {
         // Новость не попадает в прежнюю очередь платных анонсов «забрать контакт».
         // Уникальные индексы fingerprint/contentFingerprint закрывают одновременную запись дублей.
-        await prisma.lead.create({ data });
+        lead = await prisma.lead.create({ data });
       } else {
-        await createLeadWithDeliveries(data, original);
+        lead = await createLeadWithDeliveries(data, original);
+      }
+      if (category.capturePhotos) {
+        if (message.photoError) log(logs, message.photoError, 'error');
+        try { await attachLeadPhotos(lead.id, message); }
+        catch (error) { log(logs, 'Текст сохранён, фотографии пока недоступны: ' + safeParserError(error), 'error'); }
       }
       return true;
     } catch (error) {
       if (error instanceof DuplicateLeadError || isUniqueConstraintError(error)) return false;
       log(logs, `Тематическое сообщение не сохранено: ${safeParserError(error)}`, 'error');
       return false;
+    } finally {
+      await discardStagedPhotos(message);
     }
   };
 }

@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { createHash } from 'node:crypto';
 import test from 'node:test';
-import { originalParserSource, ORIGINAL_PARSER_NORMALIZED_SHA256 } from '../scripts/protected-parser-extension.mjs';
+import { originalWorkerSource, ORIGINAL_WORKER_NORMALIZED_SHA256, originalParserSource, ORIGINAL_PARSER_NORMALIZED_SHA256 } from '../scripts/protected-parser-extension.mjs';
 
 import { classifyLeadCategory, normalizeCategoryText } from '../src/lib/lead-category.ts';
 
@@ -51,8 +51,8 @@ test('парсер сохраняет исходную логику по явн�
   const report = JSON.parse(read('docs/source-integrity.json'));
   for (const file of ['src/services/max-parser.ts', 'scripts/parser_worker.py']) {
     const bytes = readFileSync(new URL(`../${file}`, import.meta.url));
-    const original = file === 'src/services/max-parser.ts' ? originalParserSource(bytes.toString('utf8')) : bytes;
-    const baseline = file === 'src/services/max-parser.ts' ? ORIGINAL_PARSER_NORMALIZED_SHA256 : report.protectedSha256[file];
+    const original = file === 'src/services/max-parser.ts' ? originalParserSource(bytes.toString('utf8')) : file === 'scripts/parser_worker.py' ? originalWorkerSource(bytes.toString('utf8')) : bytes;
+    const baseline = file === 'src/services/max-parser.ts' ? ORIGINAL_PARSER_NORMALIZED_SHA256 : ORIGINAL_WORKER_NORMALIZED_SHA256;
     assert.equal(createHash('sha256').update(original).digest('hex'), baseline);
   }
 });

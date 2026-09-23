@@ -6,7 +6,7 @@ const hostname = process.env.INTERNAL_APP_HOST || "127.0.0.1";
 const parsedPort = Number.parseInt(process.env.PORT || "3000", 10);
 const port = Number.isInteger(parsedPort) && parsedPort > 0 ? parsedPort : 3000;
 const cronSecret = process.env.CRON_SECRET || "";
-const state = { parser: false, bot: false, discovery: false };
+const state = { parser: false, bot: false, discovery: false, media: false };
 
 console.log("[CRON] Watchdog started for http://" + hostname + ":" + port);
 if (cronSecret.length === 0 && process.env.NODE_ENV === "production") {
@@ -72,3 +72,7 @@ function pollDiscovery() {
 setInterval(pollParser, 10_000);
 setInterval(pollBot, 5_000);
 setInterval(pollDiscovery, 60_000);
+// Очистка бесплатных публикаций работает и при выключенном парсере.
+setInterval(() => callInternal('/api/internal/media/cleanup', 'media', (result) => {
+  if (result.publications || result.files) console.log('[ФОТО] Удалено публикаций: ' + result.publications + ', файлов: ' + result.files);
+}, 55_000), 60_000);

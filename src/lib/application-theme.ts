@@ -25,3 +25,29 @@ export function parseApplicationTheme(input: unknown): ApplicationThemeId {
   if (Object.keys(body).length !== 1 || !isApplicationThemeId(body.theme)) throw new Error('Выберите одну тему из списка.');
   return body.theme;
 }
+
+export type ThemePresentation = {
+  feedTitle: string;
+  searchPlaceholder: string;
+  emptyTitle: string;
+  refreshLabel: string;
+  allCategoriesLabel: string;
+  actionLabel: string;
+  cardIntro: string;
+};
+
+const THEME_PRESENTATIONS: Record<ApplicationThemeId, ThemePresentation> = {
+  news: { feedTitle: 'Новости', searchPlaceholder: 'Поиск новостей…', emptyTitle: 'Новых публикаций пока нет', refreshLabel: 'Обновить новости', allCategoriesLabel: 'Все рубрики', actionLabel: 'Открыть новость', cardIntro: 'Новости из выбранных источников' },
+  jobs: { feedTitle: 'Вакансии', searchPlaceholder: 'Поиск вакансий…', emptyTitle: 'Новых вакансий пока нет', refreshLabel: 'Обновить вакансии', allCategoriesLabel: 'Все направления', actionLabel: 'Получить контакт', cardIntro: 'Работа и подработка' },
+  orders: { feedTitle: 'Заказы', searchPlaceholder: 'Поиск заказов…', emptyTitle: 'Новых заказов пока нет', refreshLabel: 'Обновить заказы', allCategoriesLabel: 'Все виды заказов', actionLabel: 'Получить контакт', cardIntro: 'Заявки клиентов' },
+  property: { feedTitle: 'Недвижимость', searchPlaceholder: 'Поиск объектов…', emptyTitle: 'Новых объявлений пока нет', refreshLabel: 'Обновить объявления', allCategoriesLabel: 'Все объекты', actionLabel: 'Связаться с автором', cardIntro: 'Аренда и недвижимость' },
+  goods: { feedTitle: 'Товары', searchPlaceholder: 'Поиск товаров…', emptyTitle: 'Новых предложений пока нет', refreshLabel: 'Обновить товары', allCategoriesLabel: 'Все товары', actionLabel: 'Связаться с продавцом', cardIntro: 'Предложения товаров' },
+  commerce: { feedTitle: 'Коммерция', searchPlaceholder: 'Поиск предложений…', emptyTitle: 'Новых предложений пока нет', refreshLabel: 'Обновить предложения', allCategoriesLabel: 'Все направления', actionLabel: 'Получить контакт', cardIntro: 'Коммерческие предложения' },
+  services: { feedTitle: 'Услуги', searchPlaceholder: 'Поиск услуг…', emptyTitle: 'Новых предложений пока нет', refreshLabel: 'Обновить услуги', allCategoriesLabel: 'Все услуги', actionLabel: 'Связаться с исполнителем', cardIntro: 'Услуги специалистов' },
+  events: { feedTitle: 'События и отдых', searchPlaceholder: 'Поиск событий…', emptyTitle: 'Новых событий пока нет', refreshLabel: 'Обновить события', allCategoriesLabel: 'Все события', actionLabel: 'Подробнее', cardIntro: 'События и отдых' },
+  free: { feedTitle: 'Отдам даром', searchPlaceholder: 'Поиск вещей…', emptyTitle: 'Новых публикаций пока нет', refreshLabel: 'Обновить публикации', allCategoriesLabel: 'Все рубрики', actionLabel: 'Посмотреть', cardIntro: 'Бесплатные предложения' },
+};
+
+export function themePresentation(theme: unknown): ThemePresentation {
+  return isApplicationThemeId(theme) ? THEME_PRESENTATIONS[theme] : THEME_PRESENTATIONS.orders;
+}

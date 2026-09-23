@@ -32,3 +32,5 @@ await import('./lead-display-regression.test.mjs');
 await import('./branding.test.mjs');
 await import('./instance-config.test.mjs');
 await import('./operator.test.mjs');
+
+await import('./lead-media.test.mjs');

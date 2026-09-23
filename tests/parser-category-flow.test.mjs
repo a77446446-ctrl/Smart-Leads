@@ -33,6 +33,7 @@ function harness({ categories = rules, aiFailure = false, processed = null } = {
     '@/lib/redact-contact': contacts, '@/lib/lead-content': content, '@/lib/lead-moderation': moderation,
   });
   const api = loadTs('src/services/max-parser.ts', {
+    './lead-media': { photoCaptureEnvironment: async () => ({ PARSER_CAPTURE_PHOTOS: '0' }) },
     './themed-message-processor': { selectMessageProcessor: async legacy => legacy },
     '@/lib/prisma': { prisma }, '@/lib/parser-lease': {},
     '@/lib/parser-accounts': { safeParserError: error => String(error) },

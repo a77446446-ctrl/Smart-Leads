@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { LeadPhotos } from '@/components/cards/LeadPhotos';
 import Image from 'next/image';
 import { MapPin, Clock, Phone, Link as LinkIcon } from 'lucide-react';
 import { LeadText, LeadIcon } from '@/components/ui/LeadText';
@@ -158,6 +159,8 @@ export const LeadCard = ({ lead, onBuy, isPurchased, highlighted }: LeadCardProp
         <h3 className="text-black font-bold text-[17px] leading-snug mb-3">
           <LeadText text={lead.title} />
         </h3>
+
+        {(isPurchased || isPublic) && <LeadPhotos photos={lead.media} />}
 
         {/* Text Body */}
         <p className="text-[#333] text-[14px] leading-relaxed mb-6 font-medium whitespace-pre-wrap break-words">

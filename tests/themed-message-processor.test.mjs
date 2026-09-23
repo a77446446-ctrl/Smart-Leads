@@ -10,8 +10,10 @@ const rules = [
   { id: 'sport', slug: 'sport', name: 'Спорт', active: true, plusKeywords: 'футбол, турнир', minusKeywords: 'ставки', leadPrice: 100 },
   { id: 'auto', slug: 'auto', name: 'Авто', active: true, plusKeywords: 'автомобиль', minusKeywords: '', leadPrice: 200 },
 ];
-async function harness({ theme = 'news', categories = rules, aiFails = false, settingFails = false, writeFails = false, race = false } = {}) {
+async function harness({ theme = 'news', categories = rules, aiFails = false, settingFails = false, writeFails = false, race = false, photoFails = false, seen = false } = {}) {
   const saved = [];
+  const attachments = [];
+  const discarded = [];
   const delivered = [];
   const logs = [];
   let analysisCount = 0;
@@ -21,11 +23,14 @@ async function harness({ theme = 'news', categories = rules, aiFails = false, se
     const row = { id: `lead-${saved.length}`, ...data }; saved.push(row); return row;
   };
   const prisma = {
+    parserSeenMessage: { findUnique: async () => seen ? { fingerprint: 'seen' } : null },
     setting: { findUnique: async () => { if (settingFails) throw new Error('Ошибка настроек'); return theme === null ? null : { value: theme }; } },
     category: { findMany: async () => categories.filter(c => c.active), upsert: async () => ({ id: 'other', slug: 'other', leadPrice: 50 }) },
     lead: { findFirst: async ({ where }) => saved.find(row => where.OR.some(condition => Object.entries(condition).every(([key, value]) => row[key] === value))) ?? null, create: insert },
   };
   const processor = loadTs('src/services/themed-message-processor.ts', {
+    '@/lib/lead-media': loadTs('src/lib/lead-media.ts', {}),
+    './lead-media': { attachLeadPhotos: async (id, message) => { if (photoFails) throw new Error('Нет места'); attachments.push({ id, photos: message.photos }); }, discardStagedPhotos: async message => discarded.push(message) },
     '@/lib/prisma': { prisma }, '@/lib/application-theme': loadTs('src/lib/application-theme.ts', {}),
     '@/lib/lead-category': loadTs('src/lib/lead-category.ts', {}),
     '@/lib/parser-message-policy': loadTs('src/lib/parser-message-policy.ts', {}),
@@ -40,7 +45,7 @@ async function harness({ theme = 'news', categories = rules, aiFails = false, se
   });
   const legacy = async () => 'legacy';
   const run = await processor.selectMessageProcessor(legacy);
-  return { run: (text, all = false, id = '1') => run({ text, id }, 'https://max.ru/source', 'Источник', all, logs), selected: run, legacy, saved, delivered, logs, analysisCount: () => analysisCount };
+  return { run: (text, all = false, id = '1', photos = []) => run({ text, id, photos }, 'https://max.ru/source', 'Источник', all, logs), selected: run, legacy, saved, delivered, logs, attachments, discarded, analysisCount: () => analysisCount };
 }
 
 test('без темы используется тот же старый обработчик; ошибки настройки не включают другой режим', async () => {
@@ -111,4 +116,32 @@ test('платные темы сохраняют контактный досту
   const all = await harness({ theme: 'orders', aiFails: true });
   assert.equal(await all.run('Публикация без контакта', true), true);
   assert.equal(all.saved[0].accessMode, 'CONTACT');
+});
+
+test('фотографии следуют настройке категории; срок бесплатной публикации не затрагивает платные лиды', async () => {
+  const h = await harness({ categories: rules.map(rule => ({ ...rule, capturePhotos: rule.id === 'auto', ttlMinutes: 180 })) });
+  const photos = [{ key: 'photo', mimeType: 'image/jpeg' }];
+  const before = Date.now();
+  assert.equal(await h.run('Автомобиль на выставке', false, '1', photos), true);
+  assert.equal(await h.run('Футбольный турнир', false, '2', photos), true);
+  assert.equal(h.attachments.length, 1);
+  assert.deepEqual(h.attachments[0].photos, photos);
+  assert.ok(h.saved[0].expiresAt.getTime() >= before + 180 * 60_000);
+  assert.equal(h.discarded.length, 2);
+  const paid = await harness({ theme: 'orders' });
+  await paid.run('Футбол контакт +79991234567');
+  assert.equal(paid.saved[0].expiresAt, null);
+});
+
+test('сбой фотографии сохраняет текст, отклонение убирает временные файлы, удалённая новость не воскресает', async () => {
+  const h = await harness({ categories: rules.map(rule => ({ ...rule, capturePhotos: true })), photoFails: true });
+  assert.equal(await h.run('Футбол'), true);
+  assert.equal(h.saved.length, 1);
+  assert.match(h.logs.at(-1).msg, /Текст сохранён/);
+  assert.equal(await h.run('Нет совпадения', false, '2'), false);
+  assert.equal(h.discarded.length, 2);
+  const old = await harness({ seen: true });
+  assert.equal(await old.run('Футбол'), false);
+  assert.equal(old.saved.length, 0);
+  assert.equal(old.discarded.length, 1);
 });

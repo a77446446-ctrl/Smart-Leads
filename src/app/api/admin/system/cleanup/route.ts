@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { adminGuard } from '@/lib/auth/admin-guard';
+import { cleanupLeadMedia } from '@/services/lead-media';
 import fs from 'fs';
 import path from 'path';
 
@@ -12,6 +13,8 @@ export async function POST() {
   if (denied) return denied;
 
   try {
+
+    const mediaCleanup = await cleanupLeadMedia();
 
     // 1. Find the retention setting
     const retentionSetting = await prisma.setting.findUnique({
@@ -34,6 +37,7 @@ export async function POST() {
       const res = await prisma.lead.updateMany({
         where: {
           categoryId: category.id,
+          expiresAt: null,
           createdAt: { lt: expirationDate },
           deletedAt: null,
           status: 'NEW'
@@ -50,7 +54,8 @@ export async function POST() {
     const hardDeletedLeads = await prisma.lead.deleteMany({
       where: {
         deletedAt: { lt: retentionDate },
-        purchases: { none: {} }
+        purchases: { none: {} },
+        expiresAt: null
       }
     });
 
@@ -96,6 +101,7 @@ export async function POST() {
       hardDeleted: hardDeletedLeads.count,
       scrubbed: scrubbedLeads.count,
       deletedDebugFiles: deletedFiles,
+      mediaCleanup,
     });
   } catch (error) {
     console.error('[CLEANUP]', error);

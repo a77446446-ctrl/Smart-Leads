@@ -21,6 +21,7 @@ import {
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { ApplicationThemeSettings } from '@/components/ApplicationThemeSettings';
+import { CategoryMediaSettings } from '@/components/CategoryMediaSettings';
 import { APPLICATION_THEMES, ApplicationThemeId } from '@/lib/application-theme';
 import { CategoryRulePreview } from '@/components/CategoryRulePreview';
 import { mergeCategoryKeywords } from '@/lib/category-editor';
@@ -330,6 +331,7 @@ export default function AdminCategoriesPage() {
       </div>
 
       <ApplicationThemeSettings onSaved={setApplicationTheme} />
+      <CategoryMediaSettings categories={categories} enabled={applicationTheme !== null} />
 
       {/* Форма категории выбранной темы. */}
       <div className="flex flex-col rounded-xl border border-zinc-700 bg-zinc-900 overflow-hidden shadow-lg">

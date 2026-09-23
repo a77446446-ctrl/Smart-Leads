@@ -20,6 +20,7 @@ from playwright.sync_api import TimeoutError as PlaywrightTimeoutError
 from playwright.sync_api import sync_playwright
 
 from proxy_runtime import build_playwright_proxy
+from parser_media import MessagePhotos
 
 SESSION_ID_RE = re.compile(r"^[A-Za-z0-9_-]{1,80}$")
 MAX_SESSION_BYTES = 10 * 1024 * 1024
@@ -310,6 +311,7 @@ def run_parser(session_id, chat_url):
                 timezone_id="Europe/Moscow",
             )
             page = context.new_page()
+            photos = MessagePhotos(page)
 
             # Загружаем SPA сразу с маршрутом чата: MAX читает hash при старте приложения.
             stage = "открытие целевого чата MAX"
@@ -328,6 +330,7 @@ def run_parser(session_id, chat_url):
             title = extract_title(page)
             messages = extract_messages(page)
             save_session(target, context, {**meta, "proxy": None, "formatVersion": 2})
+            photos.enrich(messages)
 
             empty_error = None
             if not messages:

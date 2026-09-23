@@ -48,6 +48,7 @@ export async function GET(request: Request) {
       where.status = requestedStatus === 'ARCHIVED' ? 'ARCHIVED' : { not: 'ARCHIVED' };
     } else {
       where.status = 'NEW';
+      where.OR = [{ expiresAt: null }, { expiresAt: { gt: new Date() } }];
       // После пересчёта ключей копии не занимают лимит выдачи. Прямые ссылки остаются рабочими.
       if (!leadId) where.duplicateOfId = null;
     }
@@ -65,6 +66,7 @@ export async function GET(request: Request) {
         allowContactless: true,
         accessMode: true,
         publicationTheme: true,
+        media: { where: { ready: true }, select: { id: true }, orderBy: { position: 'asc' }, take: 6 },
         city: true,
         categoryId: true,
         sourceChat: true,
@@ -102,6 +104,7 @@ export async function GET(request: Request) {
         phone: isPublic ? lead.phone : null,
         sourceChat: null,
         isPurchased: false,
+        media: isPublic ? lead.media : [],
       };
     }));
   } catch (error) {

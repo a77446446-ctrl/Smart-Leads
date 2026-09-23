@@ -84,6 +84,7 @@ model Category {
   ttlMinutes        Int                      @default(1440) // Default 24 hours (1440 mins)
   active            Boolean                  @default(true)
   imageUrl          String?
+  capturePhotos     Boolean                  @default(false)
   showcaseChatId    String?
   showcaseEnabled   Boolean                  @default(false)
   showcaseKind      String                   @default("PUBLIC")
@@ -110,6 +111,8 @@ model Lead {
   allowContactless Boolean     @default(false)
   accessMode    String         @default("CONTACT")
   publicationTheme String?
+  expiresAt     DateTime?
+  media         LeadMedia[]
   city          String
   categoryId    String
   category      Category      @relation(fields: [categoryId], references: [id])
@@ -129,8 +132,25 @@ model Lead {
 
   @@index([categoryId, status, deletedAt, createdAt])
   @@index([contentFingerprint, duplicateOfId])
+  @@index([expiresAt])
   @@index([createdAt])
   @@index([deletedAt])
+}
+
+// Файл сохраняет запись после удаления лида, пока очистка диска не завершится.
+model LeadMedia {
+  id        String   @id @default(uuid())
+  leadId    String?
+  lead      Lead?    @relation(fields: [leadId], references: [id], onDelete: SetNull)
+  position  Int
+  mimeType  String
+  bytes     Int
+  ready     Boolean  @default(false)
+  createdAt DateTime @default(now())
+
+  @@unique([leadId, position])
+  @@index([leadId, ready])
+  @@index([createdAt])
 }
 
 model UserCategoryPreference {

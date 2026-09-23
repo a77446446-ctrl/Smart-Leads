@@ -20,6 +20,7 @@ import { removeSourceChatLinks } from '@/lib/lead-source-link';
 import { createLeadWithDeliveries } from './bot-outbox';
 import { aiService, type ProcessedLead } from './ai';
 import { selectMessageProcessor } from './themed-message-processor';
+import { photoCaptureEnvironment } from './lead-media';
 
 type ParserAccount = {
   id: string;
@@ -129,6 +130,7 @@ async function cleanupExpiredLeads(logs: LogEntry[]): Promise<void> {
         where: {
           categoryId: category.id,
           status: { in: ['NEW', 'SPAM'] },
+          expiresAt: null,
           createdAt: { lt: businessCutoff(Date.now(), category.ttlMinutes || 1440) },
         },
         data: {
@@ -441,6 +443,7 @@ function failedWorker(chatUrl: string, status: WorkerStatus, error: unknown): Wo
 }
 
 async function runPlaywrightParse(chatUrl: string, account: ParserAccount): Promise<WorkerResult> {
+  const photoEnvironment = await photoCaptureEnvironment();
   return new Promise((resolve) => {
     const scriptPath = path.join(process.cwd(), 'scripts', 'parser_worker.py');
     const sessionId = account.sessionFile.replace(/\.json$/i, '');
@@ -457,6 +460,7 @@ async function runPlaywrightParse(chatUrl: string, account: ParserAccount): Prom
       stdio: ['ignore', 'pipe', 'pipe'],
       env: {
         ...process.env,
+        ...photoEnvironment,
         PYTHONIOENCODING: 'utf-8',
         PARSER_PROXY_URL: account.proxyUrl || 'direct',
         PARSER_SESSIONS_DIR: process.env.PARSER_SESSIONS_DIR || path.join(process.cwd(), 'sessions'),
