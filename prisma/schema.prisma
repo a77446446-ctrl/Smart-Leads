@@ -108,6 +108,8 @@ model Lead {
   rawText       String
   phone         String?
   allowContactless Boolean     @default(false)
+  accessMode    String         @default("CONTACT")
+  publicationTheme String?
   city          String
   categoryId    String
   category      Category      @relation(fields: [categoryId], references: [id])

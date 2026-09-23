@@ -574,6 +574,7 @@ export default function AdminCategoriesPage() {
 
         <p className="text-sm text-zinc-400">Разделяйте слова запятой, точкой с запятой или переносом строки. Словосочетание пишите целиком. Последнее введённое слово сохранится и без нажатия Enter.</p>
         <CategoryRulePreview
+          themed={applicationTheme !== null}
           name={formData.name ?? ''}
           plus={mergeCategoryKeywords(plusInput, plusTags)}
           minus={mergeCategoryKeywords(minusInput, minusTags)}

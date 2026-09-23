@@ -27,9 +27,10 @@ export const LeadCard = ({ lead, onBuy, isPurchased, highlighted }: LeadCardProp
   const [expanded, setExpanded] = useState(false);
 
   const isInfo = lead.category?.slug === 'info' || lead.category?.name?.toLowerCase().includes('инфо');
+  const isPublic = lead.accessMode === 'PUBLIC';
 
   // Mask contacts if it's not purchased yet, regardless of price
-  const shouldMask = !isPurchased && !isInfo;
+  const shouldMask = !isPurchased && !isInfo && !isPublic;
   const locationLabel = leadLocationLabel(lead.rawText, lead.city);
 
   const renderTextWithLinks = (text: string, truncateAt?: number, markAddresses = true) => {
@@ -179,7 +180,7 @@ export const LeadCard = ({ lead, onBuy, isPurchased, highlighted }: LeadCardProp
           <LeadIcon kind={/^метро\s/iu.test(locationLabel) ? 'metro' : 'location'} />
           <span className="min-w-0 whitespace-pre-wrap break-words">{renderTextWithLinks(locationLabel, undefined, false)}</span>
         </div>}
-        {!isInfo && (
+        {!isInfo && !isPublic && (
           <div className="ml-auto shrink-0 text-[11px] font-black uppercase bg-white text-black px-2 py-1 border border-black shadow-[2px_2px_0_0_var(--accent)] z-10 relative">
             {lead.category?.paymentMode === 'SUBSCRIPTION' || lead.category?.paymentMode === 'PRO'
               ? 'ПО ПОДПИСКЕ' 
@@ -188,7 +189,7 @@ export const LeadCard = ({ lead, onBuy, isPurchased, highlighted }: LeadCardProp
         )}
       </div>
 
-      {onBuy && !isPurchased && !isInfo && (
+      {onBuy && !isPurchased && !isInfo && !isPublic && (
         <button 
           onClick={() => onBuy(lead.id)}
           className="w-full mt-5 py-4 bg-accent text-black font-black text-sm border border-black hover:brightness-95 active:scale-[0.98] transition-all flex items-center justify-center gap-2 uppercase tracking-tighter"

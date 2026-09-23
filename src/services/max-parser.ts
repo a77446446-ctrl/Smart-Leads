@@ -19,6 +19,7 @@ import { hasOnlyExpiredLeadDates } from '@/lib/lead-date';
 import { removeSourceChatLinks } from '@/lib/lead-source-link';
 import { createLeadWithDeliveries } from './bot-outbox';
 import { aiService, type ProcessedLead } from './ai';
+import { selectMessageProcessor } from './themed-message-processor';
 
 type ParserAccount = {
   id: string;
@@ -627,8 +628,9 @@ async function syncWithoutLease(leaseToken: string): Promise<SyncResult> {
         }
 
       let chatLeads = 0;
+      const processReceivedMessage = await selectMessageProcessor(processMessage);
       for (const message of worker.messages) {
-        if (await processMessage(message, chatUrl, title, item.chat.parseAll, logs)) {
+        if (await processReceivedMessage(message, chatUrl, title, item.chat.parseAll, logs)) {
           leadsCount += 1;
           chatLeads += 1;
         }

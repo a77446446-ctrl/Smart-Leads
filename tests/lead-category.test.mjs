@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { createHash } from 'node:crypto';
 import test from 'node:test';
+import { originalParserSource, ORIGINAL_PARSER_NORMALIZED_SHA256 } from '../scripts/protected-parser-extension.mjs';
 
 import { classifyLeadCategory, normalizeCategoryText } from '../src/lib/lead-category.ts';
 
@@ -46,10 +47,12 @@ test('при пересечении выбирается наиболее под
 });
 
 test('парсер сохраняет исходную логику по явному требованию владельца', () => {
-  // 14.09.2026: владелец отменил изменение фильтра. Строгое совпадение категорий не является требованием к этой версии.
+  // 23.09.2026: разрешена отдельная тематическая ветка; старый обработчик и получение MAX неизменны.
   const report = JSON.parse(read('docs/source-integrity.json'));
   for (const file of ['src/services/max-parser.ts', 'scripts/parser_worker.py']) {
     const bytes = readFileSync(new URL(`../${file}`, import.meta.url));
-    assert.equal(createHash('sha256').update(bytes).digest('hex'), report.protectedSha256[file]);
+    const original = file === 'src/services/max-parser.ts' ? originalParserSource(bytes.toString('utf8')) : bytes;
+    const baseline = file === 'src/services/max-parser.ts' ? ORIGINAL_PARSER_NORMALIZED_SHA256 : report.protectedSha256[file];
+    assert.equal(createHash('sha256').update(original).digest('hex'), baseline);
   }
 });

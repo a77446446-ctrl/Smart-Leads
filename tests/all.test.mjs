@@ -21,6 +21,8 @@ await import('./runtime-and-settings-regression.test.mjs');
 await import('./settings-persistence.test.mjs');
 await import('./application-theme.test.mjs');
 await import('./category-editor.test.mjs');
+await import('./themed-message-processor.test.mjs');
+await import('./publication-access.test.mjs');
 await import('./chat-discovery-stage-4.test.mjs');
 await import('./legal-stage-5.test.mjs');
 await import('./yookassa-stage-6.test.mjs');

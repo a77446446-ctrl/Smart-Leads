@@ -66,6 +66,7 @@ export async function POST(request: Request) {
         include: { category: true },
       });
       if (!lead) throw new PurchaseError('LEAD_NOT_FOUND', 'Лид не найден', 404);
+      if (lead.accessMode === 'PUBLIC') throw new PurchaseError('PUBLICATION_NOT_PURCHASABLE', 'Эта публикация доступна для чтения без покупки', 409);
       if (lead.status !== 'NEW') throw new PurchaseError('LEAD_UNAVAILABLE', 'Лид уже забран или перемещён в архив', 409);
 
       const monetizationSetting = await tx.setting.findUnique({ where: { key: 'maks_monetization_enabled' } });

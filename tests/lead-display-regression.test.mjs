@@ -84,6 +84,16 @@ function loadComponent(relative, overrides = {}) {
 const { LeadText } = loadComponent('src/components/ui/LeadText.tsx');
 const { LeadCard } = loadComponent('src/components/cards/LeadCard.tsx');
 
+test('бесплатная новость читается без цены и покупки, старая бесплатная по цене заявка остаётся защищённой', () => {
+  const lead = { id: 'news', title: 'Турнир', rawText: 'Футбол: +79991234567', category: { slug: 'sport' }, price: 0 };
+  const html = renderToStaticMarkup(React.createElement(LeadCard, { lead: { ...lead, accessMode: 'PUBLIC' }, onBuy() {} }));
+  assert.match(html, /tel:\+79991234567/);
+  assert.doesNotMatch(html, /ЗАБРАТЬ КОНТАКТ|КОНТАКТ СКРЫТ|БЕСПЛАТНО/);
+  const old = renderToStaticMarkup(React.createElement(LeadCard, { lead, onBuy() {} }));
+  assert.doesNotMatch(old, /tel:\+79991234567/);
+  assert.match(old, /ЗАБРАТЬ КОНТАКТ/);
+});
+
 test('местоположение показывает город, а без города — метро или адрес в тексте', () => {
   for (const address of ['улица Лукьянова, дом 5', 'Москва, Волочаевская улица, 12АС1А',
     'Адрес: Москва, Комсомольская площадь, 3', '📍 ул. Парковая, д. 5']) {

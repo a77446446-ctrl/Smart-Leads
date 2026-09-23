@@ -63,6 +63,8 @@ export async function GET(request: Request) {
         rawText: true,
         phone: true,
         allowContactless: true,
+        accessMode: true,
+        publicationTheme: true,
         city: true,
         categoryId: true,
         sourceChat: true,
@@ -85,8 +87,9 @@ export async function GET(request: Request) {
         ).slice(0, take);
 
     return NextResponse.json(visibleLeads.map((lead) => {
-      const title = buildLeadTitle(lead.rawText, lead.title);
-      const cleanedText = cleanLeadText(lead.rawText);
+      const isPublic = lead.accessMode === 'PUBLIC';
+      const title = isPublic ? lead.title : buildLeadTitle(lead.rawText, lead.title);
+      const cleanedText = isPublic ? lead.rawText : cleanLeadText(lead.rawText);
       return owned ? {
         ...lead,
         title,
@@ -94,9 +97,9 @@ export async function GET(request: Request) {
         isPurchased: true,
       } : {
         ...lead,
-        title: redactContactInfo(title, true),
-        rawText: redactContactInfo(cleanedText, true),
-        phone: null,
+        title: isPublic ? title : redactContactInfo(title, true),
+        rawText: isPublic ? cleanedText : redactContactInfo(cleanedText, true),
+        phone: isPublic ? lead.phone : null,
         sourceChat: null,
         isPurchased: false,
       };
