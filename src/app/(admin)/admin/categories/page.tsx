@@ -22,6 +22,8 @@ import {
 import { cn } from '@/lib/utils';
 import { ApplicationThemeSettings } from '@/components/ApplicationThemeSettings';
 import { APPLICATION_THEMES, ApplicationThemeId } from '@/lib/application-theme';
+import { CategoryRulePreview } from '@/components/CategoryRulePreview';
+import { mergeCategoryKeywords } from '@/lib/category-editor';
 
 interface Category {
   id: string;
@@ -132,8 +134,10 @@ export default function AdminCategoriesPage() {
   const handleEdit = (cat: Category) => {
     setEditingId(cat.id);
     setFormData(cat);
-    setPlusTags(cat.plusKeywords ? cat.plusKeywords.split(',').map(s => s.trim()).filter(Boolean) : []);
-    setMinusTags(cat.minusKeywords ? cat.minusKeywords.split(',').map(s => s.trim()).filter(Boolean) : []);
+    setPlusTags(mergeCategoryKeywords(cat.plusKeywords ?? ''));
+    setMinusTags(mergeCategoryKeywords(cat.minusKeywords ?? ''));
+    setPlusInput('');
+    setMinusInput('');
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
@@ -157,17 +161,10 @@ export default function AdminCategoriesPage() {
     setMinusInput('');
   };
 
-  const processTags = (input: string, currentTags: string[]) => {
-    // Split by comma, dot, or newline
-    const newTags = input
-      .split(/[,\.\n]+/)
-      .map(tag => tag.trim())
-      .filter(tag => tag.length > 0 && !currentTags.includes(tag));
-    return [...currentTags, ...newTags];
-  };
+  const processTags = mergeCategoryKeywords;
 
   const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>, type: 'plus' | 'minus') => {
-    if (e.key === 'Enter' || e.key === ',' || e.key === '.') {
+    if (e.key === 'Enter' || e.key === ',' || e.key === '.' || e.key === ';') {
       e.preventDefault();
       const val = type === 'plus' ? plusInput : minusInput;
       if (!val.trim()) return;
@@ -273,11 +270,9 @@ export default function AdminCategoriesPage() {
     
     const finalData = {
       ...formData,
-      plusKeywords: plusTags.join(','),
-      minusKeywords: minusTags.join(',')
+      plusKeywords: mergeCategoryKeywords(plusInput, plusTags).join(','),
+      minusKeywords: mergeCategoryKeywords(minusInput, minusTags).join(',')
     };
-
-    console.log('Saving category:', finalData);
 
     try {
       const res = await fetch('/api/admin/category', {
@@ -547,7 +542,7 @@ export default function AdminCategoriesPage() {
                  onChange={e => setPlusInput(e.target.value)}
                  onKeyDown={e => handleKeyDown(e, 'plus')}
                  onPaste={e => handlePaste(e, 'plus')}
-                 placeholder={plusTags.length === 0 ? "установить, собрать, починить..." : ""}
+                 placeholder={plusTags.length === 0 ? (APPLICATION_THEMES.find(theme => theme.id === applicationTheme)?.plus ?? 'установить, собрать, починить…') : ''}
                  className="w-full min-w-full bg-transparent outline-none text-xs sm:text-sm font-bold p-1 placeholder:text-zinc-600 mt-1 text-white"
                />
             </div>
@@ -570,12 +565,20 @@ export default function AdminCategoriesPage() {
                  onChange={e => setMinusInput(e.target.value)}
                  onKeyDown={e => handleKeyDown(e, 'minus')}
                  onPaste={e => handlePaste(e, 'minus')}
-                 placeholder={minusTags.length === 0 ? "знакомства, интим, резюме..." : ""}
+                 placeholder={minusTags.length === 0 ? (APPLICATION_THEMES.find(theme => theme.id === applicationTheme)?.minus ?? 'предлагаю услуги, резюме…') : ''}
                  className="w-full min-w-full bg-transparent outline-none text-xs sm:text-sm font-bold p-1 placeholder:text-zinc-600 mt-1 text-white"
                />
             </div>
           </div>
         </div>
+
+        <p className="text-sm text-zinc-400">Разделяйте слова запятой, точкой с запятой или переносом строки. Словосочетание пишите целиком. Последнее введённое слово сохранится и без нажатия Enter.</p>
+        <CategoryRulePreview
+          name={formData.name ?? ''}
+          plus={mergeCategoryKeywords(plusInput, plusTags)}
+          minus={mergeCategoryKeywords(minusInput, minusTags)}
+          active={formData.active ?? true}
+        />
 
         <div className="flex gap-4 justify-end pt-4 border-t border-zinc-700">
           {editingId && (
