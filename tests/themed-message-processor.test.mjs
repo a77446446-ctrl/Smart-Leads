@@ -45,7 +45,7 @@ async function harness({ theme = 'news', categories = rules, aiFails = false, se
   });
   const legacy = async () => 'legacy';
   const run = await processor.selectMessageProcessor(legacy);
-  return { run: (text, all = false, id = '1', photos = []) => run({ text, id, photos }, 'https://max.ru/source', 'Источник', all, logs), selected: run, legacy, saved, delivered, logs, attachments, discarded, analysisCount: () => analysisCount };
+  return { run: (text, all = false, id = '1', photos = [], photoError) => run({ text, id, photos, photoError }, 'https://max.ru/source', 'Источник', all, logs), selected: run, legacy, saved, delivered, logs, attachments, discarded, analysisCount: () => analysisCount };
 }
 
 test('без темы используется тот же старый обработчик; ошибки настройки не включают другой режим', async () => {
@@ -155,4 +155,14 @@ test('сбой фотографии сохраняет текст, отклон�
   assert.equal(await old.run('Футбол'), false);
   assert.equal(old.saved.length, 0);
   assert.equal(old.discarded.length, 1);
+});
+
+test('повторное сообщение сохраняет диагностику отсутствующих фотографий в журнале', async () => {
+  const h = await harness({ categories: rules.map(rule => ({ ...rule, capturePhotos: true })) });
+  assert.equal(await h.run('Футбол'), true);
+  const error = 'Не найден контейнер сообщения MAX для сбора фотографий';
+  assert.equal(await h.run('Футбол', false, '1', [], error), false);
+  assert.equal(h.saved.length, 1);
+  assert.equal(h.logs.at(-1).msg, error);
+  assert.equal(h.logs.at(-1).type, 'error');
 });

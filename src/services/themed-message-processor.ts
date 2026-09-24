@@ -40,6 +40,7 @@ export async function selectMessageProcessor(legacy: MessageProcessor): Promise<
       const existing = await prisma.lead.findFirst({ where: { OR: [{ fingerprint }, { contentFingerprint }, { rawText: original, sourceChat: chatUrl }] }, select: { id: true, categoryId: true, sourceChat: true, expiresAt: true } });
       if (existing) {
         if (existing.sourceChat === chatUrl && (!existing.expiresAt || existing.expiresAt.getTime() > Date.now()) && categories.some(category => category.id === existing.categoryId && category.capturePhotos)) {
+          if (message.photoError) log(logs, message.photoError, 'error');
           try { await attachLeadPhotos(existing.id, message); }
           catch { log(logs, 'Не удалось дополнить существующее сообщение фотографиями', 'error'); }
         }

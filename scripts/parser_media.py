@@ -43,7 +43,12 @@ class MessagePhotos:
 
     def _remember(self, response):
         try:
-            if response.request.resource_type != "image":
+            mime = response.headers.get("content-type", "").split(";", 1)[0].strip().lower()
+            # Часть вложений SPA загружает через fetch/XHR перед показом в альбоме.
+            if response.request.resource_type != "image" and not (
+                response.request.resource_type in ("fetch", "xhr")
+                and mime in ("image/jpeg", "image/png", "image/gif", "image/webp")
+            ):
                 return
             if response.status != 200 or not response.url.startswith("https://"):
                 return
@@ -90,8 +95,10 @@ class MessagePhotos:
             groups = self.page.evaluate(DOM_SCRIPT, messages)
             total = 0
             started = time.monotonic()
-            for message, urls in zip(messages, groups):
-                for url in urls[:6]:
+            for message, group in zip(messages, groups):
+                if group.get("error"):
+                    message["photoError"] = group["error"]
+                for url in group["urls"][:6]:
                     if usage >= MAX_STAGING_BYTES or total >= MAX_BATCH_BYTES or time.monotonic() - started > 8:
                         message["photoError"] = "Достигнут лимит сбора фотографий за один проход"
                         break
