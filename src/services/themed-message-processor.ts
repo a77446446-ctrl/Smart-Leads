@@ -32,6 +32,10 @@ export async function selectMessageProcessor(legacy: MessageProcessor): Promise<
 
   return async (message, chatUrl, _chatTitle, parseAll, logs) => {
     try {
+      if (message.photoReport) {
+        const report = message.photoReport;
+        log(logs, `[${_chatTitle}] Фото MAX: сбор ${report.enabled ? 'включён' : 'выключен'}; сообщений: ${report.messages}; найдено фото: ${report.found}; временных файлов: ${report.saved}; ошибок фото: ${report.errors}`, report.errors ? 'error' : 'info');
+      }
       const original = message.text.replace(/\u0000/g, '').trim();
       if (isTechnicalParserMessage(original)) return false;
       const fingerprint = buildParserMessageFingerprint(chatUrl, message.id, original);

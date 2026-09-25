@@ -1,0 +1,38 @@
+<!doctype html>
+<meta charset="utf-8">
+<style>
+  body { margin: 0; }
+  main { margin-left: 300px; width: 400px; padding-top: 1600px; padding-bottom: 1200px; }
+  .message { width: 400px; }
+  .tile { display: block; width: 200px; height: 120px; border: 0; padding: 0; }
+  .image-placeholder, img { display: block; width: 100%; height: 100%; }
+  .image-placeholder { background-image: url('data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7'); }
+</style>
+<main>
+  <!-- Структура соответствует осмотренному DOM MAX; тексты и адреса тестовые. -->
+  <div class="messageWrapper">
+    <div class="message"><div class="message"><div class="bubble"><div class="bubbleContent">
+      <div class="media"><div class="grid" aria-label="Прикрепленные фото">
+        <button class="tile"><div class="image-placeholder" data-fixture-src="/1.png"></div></button>
+        <button class="tile"><div class="image-placeholder" data-fixture-src="/2.png"></div></button>
+        <button class="tile"><div class="image-placeholder" data-fixture-src="/3.png"></div></button>
+      </div></div>
+      <span class="text">В Пушкино построят новую поликлинику.</span>
+      <div class="reactions">130</div><span class="meta">33,3К 19:05</span>
+    </div></div></div></div>
+  </div>
+  <div class="messageWrapper"><div class="message">Соседнее сообщение без фотографий.</div></div>
+</main>
+<script>
+  const observer = new IntersectionObserver(entries => {
+    for (const entry of entries) {
+      if (!entry.isIntersecting) continue;
+      const img = document.createElement('img');
+      img.className = 'img image';
+      img.src = entry.target.dataset.fixtureSrc;
+      entry.target.append(img);
+      observer.unobserve(entry.target);
+    }
+  });
+  document.querySelectorAll('.image-placeholder').forEach(node => observer.observe(node));
+</script>

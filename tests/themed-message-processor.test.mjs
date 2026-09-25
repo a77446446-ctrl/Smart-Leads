@@ -45,7 +45,7 @@ async function harness({ theme = 'news', categories = rules, aiFails = false, se
   });
   const legacy = async () => 'legacy';
   const run = await processor.selectMessageProcessor(legacy);
-  return { run: (text, all = false, id = '1', photos = [], photoError) => run({ text, id, photos, photoError }, 'https://max.ru/source', 'Источник', all, logs), selected: run, legacy, saved, delivered, logs, attachments, discarded, analysisCount: () => analysisCount };
+  return { run: (text, all = false, id = '1', photos = [], photoError, photoReport) => run({ text, id, photos, photoError, photoReport }, 'https://max.ru/source', 'Источник', all, logs), selected: run, legacy, saved, delivered, logs, attachments, discarded, analysisCount: () => analysisCount };
 }
 
 test('без темы используется тот же старый обработчик; ошибки настройки не включают другой режим', async () => {
@@ -165,4 +165,16 @@ test('повторное сообщение сохраняет диагност�
   assert.equal(h.saved.length, 1);
   assert.equal(h.logs.at(-1).msg, error);
   assert.equal(h.logs.at(-1).type, 'error');
+});
+
+test('отчёт фотографий виден при выключенном сборе, нулевом результате и повторном сообщении', async () => {
+  for (const enabled of [false, true]) {
+    const h = await harness();
+    await h.run('Футбол');
+    const report = { enabled, messages: 30, found: 0, saved: 0, errors: 0 };
+    assert.equal(await h.run('Футбол', false, '1', [], undefined, report), false);
+    assert.match(h.logs.at(-1).msg, enabled ? /сбор включён/ : /сбор выключен/);
+    assert.match(h.logs.at(-1).msg, /найдено фото: 0; временных файлов: 0/);
+    assert.equal(h.saved.length, 1);
+  }
 });

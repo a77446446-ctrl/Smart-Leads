@@ -13,7 +13,59 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "scripts"))
 from parser_media import MessagePhotos, DOM_SCRIPT, image_mime
 
 
+def fixture_png():
+    def chunk(kind, value):
+        return struct.pack('!I', len(value)) + kind + value + struct.pack('!I', zlib.crc32(kind + value))
+    png = b'\x89PNG\r\n\x1a\n' + chunk(b'IHDR', struct.pack('!2I5B', 160, 100, 8, 2, 0, 0, 0))
+    return png + chunk(b'IDAT', zlib.compress((b'\x00' + b'\x55\x88\xaa' * 160) * 100)) + chunk(b'IEND', b'')
+
+
 class PhotoTests(unittest.TestCase):
+    def test_lazy_max_album_loads_after_scroll_and_incomplete_album_is_not_saved(self):
+        from playwright.sync_api import sync_playwright
+        html = Path(__file__).with_name('fixtures').joinpath('max-lazy-photos.html').read_text(encoding='utf-8')
+        png = fixture_png()
+        with tempfile.TemporaryDirectory(prefix='smart-leads-photos-') as root, patch.dict(os.environ, {'PARSER_CAPTURE_PHOTOS': '1', 'LEAD_MEDIA_DIR': root}):
+            with sync_playwright() as playwright:
+                browser = playwright.chromium.launch(headless=True)
+                for failed in (False, True):
+                    with self.subTest(failed=failed):
+                        page = browser.new_page(viewport={'width': 1100, 'height': 600})
+                        collector = MessagePhotos(page)
+                        def respond(route):
+                            if failed and route.request.url.endswith('/2.png'):
+                                route.abort()
+                            elif route.request.url.endswith('.png'):
+                                route.fulfill(status=200, content_type='image/png', body=png)
+                            else:
+                                route.fulfill(status=200, content_type='text/html; charset=utf-8', body=html)
+                        page.route('**/*', respond)
+                        page.goto('https://max.ru/fixture', wait_until='networkidle')
+                        self.assertEqual(page.locator('.media img').count(), 0)
+                        messages = page.locator('.messageWrapper').evaluate_all('(nodes) => nodes.map(node => ({text:node.innerText.trim()}))')
+                        original = [message['text'] for message in messages]
+                        collector.enrich(messages)
+                        self.assertEqual([message['text'] for message in messages], original)
+                        self.assertNotIn('photos', messages[1])
+                        if failed:
+                            self.assertNotIn('photos', messages[0])
+                            self.assertIn('после прокрутки', messages[0]['photoError'])
+                            self.assertEqual(messages[0]['photoReport']['saved'], 0)
+                            self.assertEqual(messages[0]['photoReport']['errors'], 1)
+                        else:
+                            self.assertEqual(len(messages[0]['photos']), 3)
+                            self.assertEqual(messages[0]['photoReport'], {'enabled': True, 'messages': 2, 'found': 3, 'saved': 3, 'errors': 0})
+                            for photo in messages[0]['photos']:
+                                self.assertEqual((Path(root) / 'staging' / photo['key']).read_bytes(), png)
+                        page.close()
+                browser.close()
+
+    def test_disabled_capture_reports_status_without_browser_or_disk_access(self):
+        with patch.dict(os.environ, {'PARSER_CAPTURE_PHOTOS': '0'}):
+            message = {'text': 'Новость'}
+            MessagePhotos(SimpleNamespace()).enrich([message])
+            self.assertEqual(message['photoReport'], {'enabled': False, 'messages': 1, 'found': 0, 'saved': 0, 'errors': 0})
+
     def test_dom_text_content_album_and_neighbour_boundaries(self):
         from playwright.sync_api import sync_playwright
         with sync_playwright() as playwright:
@@ -89,10 +141,7 @@ class PhotoTests(unittest.TestCase):
 
     def test_completed_browser_response_keeps_original_bytes(self):
         from playwright.sync_api import sync_playwright
-        def chunk(kind, value):
-            return struct.pack('!I', len(value)) + kind + value + struct.pack('!I', zlib.crc32(kind + value))
-        png = b'\x89PNG\r\n\x1a\n' + chunk(b'IHDR', struct.pack('!2I5B', 160, 100, 8, 2, 0, 0, 0))
-        png += chunk(b'IDAT', zlib.compress((b'\x00' + b'\x55\x88\xaa' * 160) * 100)) + chunk(b'IEND', b'')
+        png = fixture_png()
         with tempfile.TemporaryDirectory(prefix='smart-leads-photos-') as root, patch.dict(os.environ, {'PARSER_CAPTURE_PHOTOS': '1', 'LEAD_MEDIA_DIR': root}):
             with sync_playwright() as playwright:
                 browser = playwright.chromium.launch(headless=True)

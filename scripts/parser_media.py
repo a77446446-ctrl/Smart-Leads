@@ -85,7 +85,12 @@ class MessagePhotos:
         return response.body() if response else b""
 
     def enrich(self, messages):
-        if not self.enabled or not messages:
+        if not messages:
+            return
+        # Один отчёт на пакет: без текстов сообщений, URL вложений и данных сессии.
+        report = {"enabled": self.enabled, "messages": len(messages), "found": 0, "saved": 0, "errors": 0}
+        messages[0]["photoReport"] = report
+        if not self.enabled:
             return
         try:
             root = Path(os.environ.get("LEAD_MEDIA_DIR") or Path.cwd() / "data" / "lead-media")
@@ -93,6 +98,7 @@ class MessagePhotos:
             directory.mkdir(parents=True, exist_ok=True, mode=0o700)
             usage = sum(file.stat().st_size for file in directory.iterdir() if file.is_file())
             groups = self.page.evaluate(DOM_SCRIPT, messages)
+            report["found"] = sum(len(group["urls"][:6]) for group in groups)
             total = 0
             started = time.monotonic()
             for message, group in zip(messages, groups):
@@ -118,8 +124,11 @@ class MessagePhotos:
                         total += len(data)
                         usage += len(data)
                         message.setdefault("photos", []).append({"key": key, "mimeType": mime})
+                        report["saved"] += 1
                     except Exception:
                         message["photoError"] = "Не удалось сохранить фотографию; текст сохранится отдельно"
         except Exception:
             for message in messages:
                 message["photoError"] = "Сбор фотографий недоступен; текст сохранится отдельно"
+        finally:
+            report["errors"] = sum(bool(message.get("photoError")) for message in messages)
