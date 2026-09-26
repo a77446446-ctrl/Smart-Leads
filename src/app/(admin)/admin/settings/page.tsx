@@ -1,6 +1,7 @@
 'use client';
 
 import { hasTargetedChats } from '@/lib/lead-filter-mode';
+import { saveAdminSettings } from '@/lib/save-admin-settings';
 
 import React, { useState, useEffect, useRef } from 'react';
 import Image from 'next/image';
@@ -404,15 +405,17 @@ export default function SettingsPage() {
     return url.toString();
   };
 
-  const persistProxyDraft = async (): Promise<'saved'> => {
+  const persistProxyDraft = async (signal?: AbortSignal): Promise<'saved'> => {
     const proxy = currentProxyValue();
     if (proxy === 'saved') return 'saved';
     const response = await fetch('/api/admin/auth/proxy', {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ proxy }),
+      signal,
     });
     const draft = await response.json() as { saved?: boolean; protocol?: 'http://' | 'socks5://'; host?: string; port?: string; username?: string; hasPassword?: boolean; error?: string };
+    signal?.throwIfAborted();
     if (!response.ok || !draft.saved || !draft.protocol || !draft.host || !draft.port) throw new Error(draft.error || 'Не удалось сохранить прокси');
     setProxyProtocol(draft.protocol);
     setProxyIP(draft.host);
@@ -425,21 +428,13 @@ export default function SettingsPage() {
   };
 
   const handleSave = async () => {
+    if (saving) return;
     setSaving(true);
     setStatus('idle');
     setSaveError('');
     try {
-      const saveKey = async (key: string, value: string) => {
-        const res = await fetch('/api/admin/settings', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ key, value }),
-        });
-        if (!res.ok) {
-          const errData = await res.json().catch(() => ({ error: 'Ошибка сервера' }));
-          throw new Error(`Не удалось сохранить ${key}: ${(errData as any).error || res.status}`);
-        }
-      };
+      const batch: { key: string; value: string }[] = [];
+      const saveKey = (key: string, value: string) => { batch.push({ key, value }); };
 
       await saveKey('maks_main_channel', settings['maks_main_channel'] || '');
       await saveKey('maks_ai_api_key', settings['maks_ai_api_key'] || '');
@@ -457,9 +452,8 @@ export default function SettingsPage() {
       await saveKey('maks_parser_time_enabled', parseTimeEnabled ? 'true' : 'false');
       await saveKey('maks_connection_mode', canBypass ? 'direct' : 'proxy');
 
-      if (!canBypass && (proxyIP || proxyPort || proxyUser || proxyPass)) {
-        await persistProxyDraft();
-      }
+      await saveAdminSettings(batch, !canBypass && (proxyIP || proxyPort || proxyUser || proxyPass)
+        ? persistProxyDraft : undefined);
       setStatus('success');
       setHasUnsavedChanges(false);
       setTimeout(() => setStatus('idle'), 3000);

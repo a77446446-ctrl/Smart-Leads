@@ -21,6 +21,7 @@ from playwright.sync_api import sync_playwright
 
 from proxy_runtime import build_playwright_proxy
 from parser_media import MessagePhotos
+from parser_engagement import enrich_engagement
 
 SESSION_ID_RE = re.compile(r"^[A-Za-z0-9_-]{1,80}$")
 MAX_SESSION_BYTES = 10 * 1024 * 1024
@@ -329,6 +330,7 @@ def run_parser(session_id, chat_url):
             human_scroll(page)
             title = extract_title(page)
             messages = extract_messages(page)
+            enrich_engagement(page, messages)
             save_session(target, context, {**meta, "proxy": None, "formatVersion": 2})
             photos.enrich(messages)
 

@@ -5,6 +5,8 @@ import * as identity from '../src/lib/lead-identity.ts';
 import * as contacts from '../src/lib/redact-contact.ts';
 import * as dates from '../src/lib/lead-date.ts';
 import * as sourceLinks from '../src/lib/lead-source-link.ts';
+import * as engagement from '../src/lib/lead-engagement.ts';
+import * as display from '../src/lib/lead-display.ts';
 
 const rules = [
   { id: 'sport', slug: 'sport', name: 'Спорт', active: true, plusKeywords: 'футбол, турнир', minusKeywords: 'ставки', leadPrice: 100 },
@@ -29,6 +31,8 @@ async function harness({ theme = 'news', categories = rules, aiFails = false, se
     lead: { findFirst: async ({ where }) => saved.find(row => where.OR.some(condition => Object.entries(condition).every(([key, value]) => row[key] === value))) ?? null, create: insert },
   };
   const processor = loadTs('src/services/themed-message-processor.ts', {
+    '@/lib/lead-engagement': engagement,
+    '@/lib/lead-display': display,
     '@/lib/lead-media': loadTs('src/lib/lead-media.ts', {}),
     './lead-media': { attachLeadPhotos: async (id, message) => { if (photoFails) throw new Error('Нет места'); attachments.push({ id, photos: message.photos }); }, discardStagedPhotos: async message => discarded.push(message) },
     '@/lib/prisma': { prisma }, '@/lib/application-theme': loadTs('src/lib/application-theme.ts', {}),

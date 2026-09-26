@@ -5,6 +5,7 @@ import { prisma } from '@/lib/prisma';
 import { hasActionableLeadContact, redactContactInfo } from '@/lib/redact-contact';
 import { buildLeadTitle } from '@/lib/lead-title';
 import { uniqueLeadCards, cleanLeadText } from '@/lib/lead-content';
+import { presentLeadEngagement } from '@/lib/lead-engagement';
 
 export const dynamic = 'force-dynamic';
 
@@ -62,6 +63,7 @@ export async function GET(request: Request) {
         id: true,
         title: true,
         rawText: true,
+        sourceEngagement: true,
         phone: true,
         allowContactless: true,
         accessMode: true,
@@ -91,14 +93,20 @@ export async function GET(request: Request) {
     return NextResponse.json(visibleLeads.map((lead) => {
       const isPublic = lead.accessMode === 'PUBLIC';
       const title = isPublic ? lead.title : buildLeadTitle(lead.rawText, lead.title);
-      const cleanedText = isPublic ? lead.rawText : cleanLeadText(lead.rawText);
+      const presentation = presentLeadEngagement(lead.rawText, lead.sourceEngagement);
+      const cleanedText = isPublic ? presentation.text : cleanLeadText(presentation.text);
+      // Тело статистики тоже может содержать контакты: в ответ отдаём только счётчики.
+      const sourceEngagement = presentation.engagement?.show
+        ? { ...presentation.engagement, body: '', show: true } : null;
       return owned ? {
         ...lead,
+        sourceEngagement,
         title,
         rawText: cleanedText,
         isPurchased: true,
       } : {
         ...lead,
+        sourceEngagement,
         title: isPublic ? title : redactContactInfo(title, true),
         rawText: isPublic ? cleanedText : redactContactInfo(cleanedText, true),
         phone: isPublic ? lead.phone : null,

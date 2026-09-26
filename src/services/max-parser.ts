@@ -20,7 +20,9 @@ import { removeSourceChatLinks } from '@/lib/lead-source-link';
 import { createLeadWithDeliveries } from './bot-outbox';
 import { aiService, type ProcessedLead } from './ai';
 import { selectMessageProcessor } from './themed-message-processor';
+import { saveParserChatResults } from './parser-chat-results';
 import { photoCaptureEnvironment } from './lead-media';
+import type { StagedPhoto, PhotoReport } from '@/lib/lead-media';
 
 type ParserAccount = {
   id: string;
@@ -43,7 +45,7 @@ type WorkerStatus = 'OK' | 'EMPTY' | 'AUTH_REQUIRED' | 'RATE_LIMITED' | 'PROXY_E
 
 type WorkerResult = {
   title: string | null;
-  messages: Array<{ text: string; id?: string }>;
+  messages: Array<{ text: string; id?: string; photos?: StagedPhoto[]; photoError?: string; photoReport?: PhotoReport; engagement?: unknown }>;
   source_chat: string;
   status: WorkerStatus;
   error?: string;
@@ -504,7 +506,7 @@ async function runPlaywrightParse(chatUrl: string, account: ParserAccount): Prom
           throw new Error('Worker вернул некорректную структуру');
         }
         const messages = parsed.messages
-          .filter((item): item is { text: string; id?: string } => Boolean(item && typeof item.text === 'string'))
+          .filter((item): item is WorkerResult['messages'][number] => Boolean(item && typeof item.text === 'string'))
           .slice(-100);
         finish({
           title: typeof parsed.title === 'string' ? parsed.title.slice(0, 200) : null,
@@ -532,11 +534,7 @@ async function saveChats(chats: ParserChat[]): Promise<void> {
     lastRunLeadsCount: chat.lastRunLeadsCount,
     lastParsedAt: chat.lastParsedAt,
   }));
-  await prisma.setting.upsert({
-    where: { key: 'maks_parsing_chats' },
-    update: { value: JSON.stringify(legacyChats) },
-    create: { key: 'maks_parsing_chats', value: JSON.stringify(legacyChats) },
-  });
+  await saveParserChatResults(legacyChats);
 }
 
 async function syncWithoutLease(leaseToken: string): Promise<SyncResult> {

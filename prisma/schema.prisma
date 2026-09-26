@@ -107,6 +107,7 @@ model Lead {
   id            String        @id @default(uuid())
   title         String
   rawText       String
+  sourceEngagement Json?
   phone         String?
   allowContactless Boolean     @default(false)
   accessMode    String         @default("CONTACT")

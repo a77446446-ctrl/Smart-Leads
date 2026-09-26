@@ -35,6 +35,17 @@ async (messages) => {
     const candidates = Array.from(document.querySelectorAll(candidateSelector));
     const text = normalize(message.text.split('\n\nКонтакты (ссылки): ')[0]);
     if (!text) return { urls: [] };
+    // Счётчики меняются во время загрузки фото. Сопоставляем стабильное тело сообщения,
+    // сохраняя границу messageWrapper и проверку единственности совпадения.
+    const stableBody = message.engagement?.body?.split('\n\nКонтакты (ссылки): ')[0];
+    if (stableBody) {
+      const wrappers = Array.from(document.querySelectorAll('.messageWrapper')).filter(node => {
+        const body = node.querySelector('.bubbleContent > .text');
+        return body && textOf(body) === normalize(stableBody);
+      });
+      if (wrappers.length === 1) return { container: wrappers[0], ...inspect(wrappers[0]) };
+      if (wrappers.length > 1) return { urls: [], error: 'Не удалось однозначно связать фотографии с сообщением MAX' };
+    }
     const byId = message.id ? candidates.filter(node => visible(node)
       && [node.getAttribute('data-mid'), node.getAttribute('data-id')].includes(message.id)) : [];
     const matches = byId.length ? byId : candidates.filter(node => visible(node) && textOf(node) === text);
@@ -59,7 +70,7 @@ async (messages) => {
     }
     return { urls: [] };
   };
-  const deadline = Date.now() + 15000;
+  const deadline = Date.now() + 30000;
   const groups = [];
   for (const message of messages) {
     let state = locate(message);
@@ -73,7 +84,9 @@ async (messages) => {
     }
     if (state.pending?.length) {
       // Частичный альбом не сохраняем: иначе позиции снимков перепутаются при повторном сборе.
-      groups.push({ urls: [], error: 'Фотографии MAX не загрузились после прокрутки за отведённое время' });
+      groups.push({ urls: [], error: Date.now() >= deadline
+        ? 'Достигнут лимит ожидания фотографий за проход; повторите сбор'
+        : 'Фотографии MAX не загрузились после прокрутки за отведённое время' });
     } else {
       groups.push(state.error ? { urls: [], error: state.error } : { urls: state.urls });
     }

@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { LeadPhotos } from '@/components/cards/LeadPhotos';
+import { LeadEngagement } from '@/components/cards/LeadEngagement';
 import Image from 'next/image';
 import { MapPin, Clock, Phone, Link as LinkIcon } from 'lucide-react';
 import { LeadText, LeadIcon } from '@/components/ui/LeadText';
@@ -176,6 +177,7 @@ export const LeadCard = ({ lead, onBuy, isPurchased, highlighted }: LeadCardProp
             {expanded ? 'Скрыть' : 'Подробнее...'}
           </button>
         )}
+        <LeadEngagement value={lead.sourceEngagement} />
       </div>
       
       <div className="flex flex-wrap items-start justify-between gap-3 mt-auto pt-4 border-t border-[#ddd] relative">

@@ -4,6 +4,7 @@ import { loadTs } from './helpers/load-ts.mjs';
 import * as contacts from '../src/lib/redact-contact.ts';
 import * as titles from '../src/lib/lead-title.ts';
 import * as content from '../src/lib/lead-content.ts';
+import * as engagement from '../src/lib/lead-engagement.ts';
 
 class AuthenticationError extends Error {}
 const next = { NextResponse: { json: (body, init) => Response.json(body, init) } };
@@ -14,6 +15,7 @@ test('лента открывает контакты только явно бе�
     category: { slug: 'sport', name: 'Спорт' }, allowContactless: true, accessMode, price: 0, sourceChat: 'https://max.ru/private',
   }));
   const route = loadTs('src/app/api/leads/route.ts', {
+    '@/lib/lead-engagement': engagement,
     'next/server': next,
     '@/lib/auth/current-user': { AuthenticationError, requireCurrentUser: async () => ({ id: 'reader' }) },
     '@/lib/prisma': { prisma: { lead: { findMany: async () => rows } } },

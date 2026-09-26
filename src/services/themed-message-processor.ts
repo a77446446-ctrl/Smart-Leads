@@ -1,4 +1,6 @@
 import type { Prisma } from '@prisma/client';
+import { normalizeEngagement } from '@/lib/lead-engagement';
+import { cleanLeadText } from '@/lib/lead-display';
 import { publicationExpiresAt, type PhotoMessage } from '@/lib/lead-media';
 import { attachLeadPhotos, discardStagedPhotos } from './lead-media';
 import { prisma } from '@/lib/prisma';
@@ -37,12 +39,17 @@ export async function selectMessageProcessor(legacy: MessageProcessor): Promise<
         log(logs, `[${_chatTitle}] Фото MAX: сбор ${report.enabled ? 'включён' : 'выключен'}; сообщений: ${report.messages}; найдено фото: ${report.found}; временных файлов: ${report.saved}; ошибок фото: ${report.errors}`, report.errors ? 'error' : 'info');
       }
       const original = message.text.replace(/\u0000/g, '').trim();
+      const engagement = normalizeEngagement(message.engagement, parseAll);
+      const body = engagement?.body || cleanLeadText(original);
       if (isTechnicalParserMessage(original)) return false;
       const fingerprint = buildParserMessageFingerprint(chatUrl, message.id, original);
       const contentFingerprint = buildLeadContentFingerprint({ rawText: original });
       if (publicAccess && await prisma.parserSeenMessage.findUnique({ where: { fingerprint } })) return false;
       const existing = await prisma.lead.findFirst({ where: { OR: [{ fingerprint }, { contentFingerprint }, { rawText: original, sourceChat: chatUrl }] }, select: { id: true, categoryId: true, sourceChat: true, expiresAt: true } });
       if (existing) {
+        if (existing.sourceChat === chatUrl && (!existing.expiresAt || existing.expiresAt.getTime() > Date.now()) && engagement) {
+          await prisma.lead.update({ where: { id: existing.id }, data: { sourceEngagement: engagement } });
+        }
         if (existing.sourceChat === chatUrl && (!existing.expiresAt || existing.expiresAt.getTime() > Date.now()) && categories.some(category => category.id === existing.categoryId && category.capturePhotos)) {
           if (message.photoError) log(logs, message.photoError, 'error');
           try { await attachLeadPhotos(existing.id, message); }
@@ -51,7 +58,7 @@ export async function selectMessageProcessor(legacy: MessageProcessor): Promise<
         return false;
       }
 
-      const match = classifyLeadCategory(original, categories);
+      const match = classifyLeadCategory(body, categories);
       if (!parseAll && !match.matched) {
         log(logs, 'Тематический отбор: нет подходящей активной категории по словам');
         // Отказ по текущим правилам не запоминается навсегда: администратор может исправить слова.
@@ -62,7 +69,7 @@ export async function selectMessageProcessor(legacy: MessageProcessor): Promise<
         if (original.length <= 15 || original.length >= 2000 || !hasActionableLeadContact(contactText) || hasOnlyExpiredLeadDates(original)) return false;
       }
       let metadata: Awaited<ReturnType<typeof aiService.processLead>> | null = null;
-      try { metadata = await aiService.processLead(original); }
+      try { metadata = await aiService.processLead(body); }
       catch (error) {
         if (!parseAll && !publicAccess) throw error;
         log(logs, `Анализ метаданных недоступен: ${safeParserError(error)}`);
@@ -77,6 +84,7 @@ export async function selectMessageProcessor(legacy: MessageProcessor): Promise<
       const data: Prisma.LeadUncheckedCreateInput = {
         title: original.split(/\r?\n/).find(line => line.trim())!.trim().slice(0, 200),
         rawText: original, city: String(metadata?.city || 'Не указан').slice(0, 100),
+        ...(engagement ? { sourceEngagement: engagement } : {}),
         categoryId: category.id, sourceChat: chatUrl, fingerprint, contentFingerprint,
         allowContactless: publicAccess || parseAll, publicationTheme: theme,
         accessMode: publicAccess ? 'PUBLIC' : 'CONTACT', price: publicAccess ? 0 : category.leadPrice,

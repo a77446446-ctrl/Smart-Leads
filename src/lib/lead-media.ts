@@ -4,7 +4,7 @@ export const MAX_LEAD_PHOTOS = 6;
 export const MEDIA_KEY = /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/;
 export type StagedPhoto = { key: string; mimeType: string };
 export type PhotoReport = { enabled: boolean; messages: number; found: number; saved: number; errors: number };
-export type PhotoMessage = { text: string; id?: string; photos?: StagedPhoto[]; photoError?: string; photoReport?: PhotoReport };
+export type PhotoMessage = { text: string; id?: string; photos?: StagedPhoto[]; photoError?: string; photoReport?: PhotoReport; engagement?: unknown };
 
 export function mediaRoot() {
   return path.resolve(process.env.LEAD_MEDIA_DIR || path.join(process.cwd(), 'data', 'lead-media'));

@@ -19,6 +19,8 @@ await import('./parser-stage-3.test.mjs');
 await import('./auth-qr-regression.test.mjs');
 await import('./runtime-and-settings-regression.test.mjs');
 await import('./settings-persistence.test.mjs');
+await import('./settings-save.test.mjs');
+await import('./lead-engagement.test.mjs');
 await import('./application-theme.test.mjs');
 await import('./category-editor.test.mjs');
 await import('./themed-message-processor.test.mjs');
