@@ -68,7 +68,7 @@ export async function GET(request: Request) {
         allowContactless: true,
         accessMode: true,
         publicationTheme: true,
-        media: { where: { ready: true }, select: { id: true }, orderBy: { position: 'asc' }, take: 6 },
+        media: { where: { ready: true }, select: { id: true, mimeType: true }, orderBy: { position: 'asc' }, take: 7 },
         city: true,
         categoryId: true,
         sourceChat: true,

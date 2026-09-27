@@ -85,6 +85,7 @@ model Category {
   active            Boolean                  @default(true)
   imageUrl          String?
   capturePhotos     Boolean                  @default(false)
+  captureVideos     Boolean                  @default(false)
   showcaseChatId    String?
   showcaseEnabled   Boolean                  @default(false)
   showcaseKind      String                   @default("PUBLIC")

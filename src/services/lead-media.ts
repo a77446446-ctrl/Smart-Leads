@@ -5,18 +5,18 @@ import { randomUUID } from 'node:crypto';
 import { prisma } from '@/lib/prisma';
 import { isApplicationThemeId, APPLICATION_THEME_SETTING_KEY } from '@/lib/application-theme';
 import { MAX_IMAGE_BYTES, hasValidImageSignature } from '@/lib/image-upload';
-import { MAX_LEAD_PHOTOS, MEDIA_KEY, mediaPath, mediaRoot, mediaLimitBytes, type PhotoMessage } from '@/lib/lead-media';
+import { MAX_LEAD_PHOTOS, MAX_LEAD_VIDEOS, MAX_VIDEO_BYTES, MEDIA_KEY, mediaPath, mediaRoot, mediaLimitBytes, type PhotoMessage } from '@/lib/lead-media';
 
-/** Ошибка настроек фотографий не должна останавливать получение текста или вход в MAX. */
+/** Ошибка настроек медиа не должна останавливать получение текста или вход в MAX. */
 export async function photoCaptureEnvironment(): Promise<Record<string, string>> {
   try {
     const theme = await prisma.setting.findUnique({ where: { key: APPLICATION_THEME_SETTING_KEY } });
-    const enabled = theme && isApplicationThemeId(theme.value)
-      && await prisma.category.findFirst({ where: { capturePhotos: true }, select: { id: true } });
-    return { PARSER_CAPTURE_PHOTOS: enabled ? '1' : '0' };
+    const enabled = theme && isApplicationThemeId(theme.value);
+    const categories = enabled ? await prisma.category.findMany({ where: { OR: [{ capturePhotos: true }, { captureVideos: true }] }, select: { capturePhotos: true, captureVideos: true } }) : [];
+    return { PARSER_CAPTURE_PHOTOS: categories.some(item => item.capturePhotos) ? '1' : '0', PARSER_CAPTURE_VIDEOS: categories.some(item => item.captureVideos) ? '1' : '0' };
   } catch {
-    console.error('[ФОТО] Не удалось прочитать настройки фотографий');
-    return { PARSER_CAPTURE_PHOTOS: '0' };
+    console.error('[МЕДИА] Не удалось прочитать настройки категорий');
+    return { PARSER_CAPTURE_PHOTOS: '0', PARSER_CAPTURE_VIDEOS: '0' };
   }
 }
 
@@ -26,10 +26,10 @@ async function removeFile(file: string) {
 }
 
 export async function discardStagedPhotos(message: PhotoMessage) {
-  for (const photo of (Array.isArray(message.photos) ? message.photos : []).slice(0, MAX_LEAD_PHOTOS)) {
+  for (const photo of [...(Array.isArray(message.photos) ? message.photos : []).slice(0, MAX_LEAD_PHOTOS), ...(Array.isArray(message.videos) ? message.videos : []).slice(0, MAX_LEAD_VIDEOS)]) {
     if (typeof photo?.key === 'string' && MEDIA_KEY.test(photo.key)) {
       try { await removeFile(mediaPath(photo.key, true)); }
-      catch { console.error('[ФОТО] Временный файл будет повторно удалён при очистке'); }
+      catch { console.error('[МЕДИА] Временный файл будет повторно удалён при очистке'); }
     }
   }
 }
@@ -60,6 +60,37 @@ export async function attachLeadPhotos(leadId: string, message: PhotoMessage) {
     });
     if (!id) continue;
     // Неуспешная запись остаётся ready=false и будет удалена отдельной уборкой.
+    await mkdir(path.join(mediaRoot(), 'files'), { recursive: true, mode: 0o700 });
+    const output = await open(mediaPath(id), 'wx', 0o600);
+    try { await output.writeFile(bytes); } finally { await output.close(); }
+    await prisma.leadMedia.update({ where: { id }, data: { ready: true } });
+  }
+}
+
+export async function attachLeadVideos(leadId: string, message: PhotoMessage) {
+  for (const [index, video] of (Array.isArray(message.videos) ? message.videos : []).slice(0, MAX_LEAD_VIDEOS).entries()) {
+    if (!video || video.mimeType !== 'video/mp4' || typeof video.key !== 'string' || !MEDIA_KEY.test(video.key)) continue;
+    const source = mediaPath(video.key, true);
+    const stat = await lstat(source);
+    if (!stat.isFile() || stat.isSymbolicLink() || !stat.size || stat.size > MAX_VIDEO_BYTES) continue;
+    const handle = await open(source, constants.O_RDONLY | (constants.O_NOFOLLOW || 0));
+    let bytes: Buffer;
+    try {
+      const current = await handle.stat();
+      if (!current.isFile() || !current.size || current.size > MAX_VIDEO_BYTES) continue;
+      bytes = await handle.readFile();
+    } finally { await handle.close(); }
+    if (bytes.length < 12 || bytes.toString('ascii', 4, 8) !== 'ftyp') continue;
+    const position = MAX_LEAD_PHOTOS + index;
+    const id = await prisma.$transaction(async tx => {
+      await tx.$executeRaw`SELECT pg_advisory_xact_lock(72416321)`;
+      if (await tx.leadMedia.findUnique({ where: { leadId_position: { leadId, position } } })) return null;
+      const used = await tx.leadMedia.aggregate({ _sum: { bytes: true } });
+      if ((used._sum.bytes || 0) + bytes.length > mediaLimitBytes()) throw new Error('Достигнут лимит хранилища медиа');
+      const row = await tx.leadMedia.create({ data: { id: randomUUID(), leadId, position, mimeType: 'video/mp4', bytes: bytes.length } });
+      return row.id;
+    });
+    if (!id) continue;
     await mkdir(path.join(mediaRoot(), 'files'), { recursive: true, mode: 0o700 });
     const output = await open(mediaPath(id), 'wx', 0o600);
     try { await output.writeFile(bytes); } finally { await output.close(); }

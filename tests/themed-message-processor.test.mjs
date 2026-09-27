@@ -12,9 +12,10 @@ const rules = [
   { id: 'sport', slug: 'sport', name: 'Спорт', active: true, plusKeywords: 'футбол, турнир', minusKeywords: 'ставки', leadPrice: 100 },
   { id: 'auto', slug: 'auto', name: 'Авто', active: true, plusKeywords: 'автомобиль', minusKeywords: '', leadPrice: 200 },
 ];
-async function harness({ theme = 'news', categories = rules, aiFails = false, settingFails = false, writeFails = false, race = false, photoFails = false, seen = false } = {}) {
+async function harness({ theme = 'news', categories = rules, aiFails = false, settingFails = false, writeFails = false, race = false, photoFails = false, videoFails = false, seen = false } = {}) {
   const saved = [];
   const attachments = [];
+  const videoAttachments = [];
   const discarded = [];
   const delivered = [];
   const logs = [];
@@ -34,7 +35,7 @@ async function harness({ theme = 'news', categories = rules, aiFails = false, se
     '@/lib/lead-engagement': engagement,
     '@/lib/lead-display': display,
     '@/lib/lead-media': loadTs('src/lib/lead-media.ts', {}),
-    './lead-media': { attachLeadPhotos: async (id, message) => { if (photoFails) throw new Error('Нет места'); attachments.push({ id, photos: message.photos }); }, discardStagedPhotos: async message => discarded.push(message) },
+    './lead-media': { attachLeadPhotos: async (id, message) => { if (photoFails) throw new Error('Нет места'); attachments.push({ id, photos: message.photos }); }, attachLeadVideos: async (id, message) => { if (videoFails) throw new Error('Нет места'); videoAttachments.push({ id, videos: message.videos }); }, discardStagedPhotos: async message => discarded.push(message) },
     '@/lib/prisma': { prisma }, '@/lib/application-theme': loadTs('src/lib/application-theme.ts', {}),
     '@/lib/lead-category': loadTs('src/lib/lead-category.ts', {}),
     '@/lib/parser-message-policy': loadTs('src/lib/parser-message-policy.ts', {}),
@@ -49,7 +50,7 @@ async function harness({ theme = 'news', categories = rules, aiFails = false, se
   });
   const legacy = async () => 'legacy';
   const run = await processor.selectMessageProcessor(legacy);
-  return { run: (text, all = false, id = '1', photos = [], photoError, photoReport) => run({ ...(typeof text === 'object' ? text : { text }), id, photos, photoError, photoReport }, 'https://max.ru/source', 'Источник', all, logs), selected: run, legacy, saved, delivered, logs, attachments, discarded, analysisCount: () => analysisCount };
+  return { run: (text, all = false, id = '1', photos = [], photoError, photoReport) => run({ ...(typeof text === 'object' ? text : { text }), id, photos, photoError, photoReport }, 'https://max.ru/source', 'Источник', all, logs), selected: run, legacy, saved, delivered, logs, attachments, videoAttachments, discarded, analysisCount: () => analysisCount };
 }
 
 test('без темы используется тот же старый обработчик; ошибки настройки не включают другой режим', async () => {
@@ -135,6 +136,22 @@ test('фотографии следуют настройке категории;
   const paid = await harness({ theme: 'orders' });
   await paid.run('Футбол контакт +79991234567');
   assert.equal(paid.saved[0].expiresAt, null);
+});
+
+test('видео следует отдельному флажку категории, дополняет повтор и не блокирует текст при ошибке', async () => {
+  const categories = rules.map(rule => ({ ...rule, capturePhotos: false, captureVideos: rule.id === 'sport' }));
+  const videos = [{ key: 'video', mimeType: 'video/mp4' }];
+  const h = await harness({ categories });
+  assert.equal(await h.run({ text: 'Футбол', videos }), true);
+  assert.equal(await h.run({ text: 'Автомобиль', videos }, false, '2'), true);
+  assert.equal(h.videoAttachments.length, 1);
+  assert.deepEqual(h.videoAttachments[0].videos, videos);
+  assert.equal(await h.run({ text: 'Футбол', videos }), false);
+  assert.equal(h.videoAttachments.length, 2);
+  const failed = await harness({ categories, videoFails: true });
+  assert.equal(await failed.run({ text: 'Футбол', videos }), true);
+  assert.equal(failed.saved.length, 1);
+  assert.ok(failed.logs.some(entry => entry.msg.includes('видео пока недоступно')));
 });
 
 test('повторный разбор дополняет существующую новость фотографией из категории Другое', async () => {

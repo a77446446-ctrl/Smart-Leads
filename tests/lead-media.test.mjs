@@ -63,11 +63,23 @@ test('файлы: импорт, повтор, квота, закрытый HTTP-
     assert.deepEqual(await readFile(media.mediaPath(rows[0].id)), image);
     await service.attachLeadPhotos('lead', message);
     assert.equal(rows.length, 1);
+    const videoKey = randomUUID();
+    const video = Buffer.from([0, 0, 0, 16, 0x66, 0x74, 0x79, 0x70, 0x69, 0x73, 0x6f, 0x6d, 0, 0, 0, 0]);
+    await writeFile(media.mediaPath(videoKey, true), video);
+    const videoMessage = { text: 'Видео', videos: [{ key: videoKey, mimeType: 'video/mp4' }] };
+    await service.attachLeadVideos('lead', videoMessage);
+    assert.equal(rows.length, 2);
+    assert.equal(rows[1].position, 6);
+    assert.deepEqual(await readFile(media.mediaPath(rows[1].id)), video);
+    await service.attachLeadVideos('lead', videoMessage);
+    assert.equal(rows.length, 2);
     quota = media.mediaLimitBytes();
     await assert.rejects(service.attachLeadPhotos('other', message), /лимит хранилища/);
-    assert.equal(rows.length, 1);
+    assert.equal(rows.length, 2);
     await service.discardStagedPhotos(message);
+    await service.discardStagedPhotos(videoMessage);
     await assert.rejects(access(media.mediaPath(key, true)));
+    await assert.rejects(access(media.mediaPath(videoKey, true)));
 
     class AuthenticationError extends Error {}
     let authorized = true;
@@ -77,6 +89,7 @@ test('файлы: импорт, повтор, квота, закрытый HTTP-
       '@/lib/lead-media': media, '@/lib/image-upload': images,
     });
     const get = () => route.GET(new Request('https://app.example/api/lead-media/x'), { params: Promise.resolve({ id: rows[0].id }) });
+    const getVideo = () => route.GET(new Request('https://app.example/api/lead-media/x'), { params: Promise.resolve({ id: rows[1].id }) });
     assert.equal((await get()).status, 404);
     lead.purchases = [{ userId: 'stranger' }];
     assert.equal((await get()).status, 404);
@@ -85,6 +98,10 @@ test('файлы: импорт, повтор, квота, закрытый HTTP-
     assert.equal(response.status, 200);
     assert.equal(response.headers.get('cache-control'), 'private, no-store');
     assert.deepEqual(Buffer.from(await response.arrayBuffer()), image);
+    const videoResponse = await getVideo();
+    assert.equal(videoResponse.status, 200);
+    assert.equal(videoResponse.headers.get('content-type'), 'video/mp4');
+    assert.deepEqual(Buffer.from(await videoResponse.arrayBuffer()), video);
     authorized = false;
     assert.equal((await get()).status, 401);
 
@@ -111,7 +128,7 @@ test('настройка фотографий проверяет админис�
     '@/lib/auth/admin-guard': { adminGuard: async () => admin ? null : Response.json({}, { status: 403 }) },
     '@/lib/same-app-origin': { isSameAppOrigin: () => sameOrigin },
     '@/lib/bounded-json': { readBoundedJson: request => request.json() },
-    '@/lib/prisma': { prisma: { category: { updateMany: async ({ where, data }) => { assert.equal(where.id, 'sport'); assert.equal(data.capturePhotos, true); writes++; return { count: 1 }; } } } },
+    '@/lib/prisma': { prisma: { category: { updateMany: async ({ where, data }) => { assert.equal(where.id, 'sport'); assert.equal(data.capturePhotos, true); assert.equal(data.captureVideos, true); writes++; return { count: 1 }; } } } },
   });
   const post = body => route.POST(new Request('https://app.example/api/admin/category-media', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) }));
   assert.equal((await post({})).status, 403);
@@ -119,7 +136,8 @@ test('настройка фотографий проверяет админис�
   assert.equal((await post({})).status, 403);
   sameOrigin = true;
   assert.equal((await post({ categoryId: 'sport', capturePhotos: 'true' })).status, 400);
+  assert.equal((await post({ categoryId: 'sport', capturePhotos: true, captureVideos: 'true' })).status, 400);
   assert.equal(writes, 0);
-  assert.equal((await post({ categoryId: 'sport', capturePhotos: true })).status, 200);
+  assert.equal((await post({ categoryId: 'sport', capturePhotos: true, captureVideos: true })).status, 200);
   assert.equal(writes, 1);
 });

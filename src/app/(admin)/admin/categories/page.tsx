@@ -42,6 +42,7 @@ interface Category {
   showcaseEnabled: boolean;
   showcaseKind: 'PUBLIC' | 'PRIVATE';
   capturePhotos: boolean;
+  captureVideos: boolean;
 }
 
 interface MaxBotChat {

@@ -1,10 +1,13 @@
 import path from 'node:path';
 
 export const MAX_LEAD_PHOTOS = 6;
+export const MAX_LEAD_VIDEOS = 1;
+export const MAX_VIDEO_BYTES = 3 * 1024 * 1024;
 export const MEDIA_KEY = /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/;
 export type StagedPhoto = { key: string; mimeType: string };
+export type StagedVideo = { key: string; mimeType: 'video/mp4' };
 export type PhotoReport = { enabled: boolean; messages: number; found: number; saved: number; errors: number };
-export type PhotoMessage = { text: string; id?: string; photos?: StagedPhoto[]; photoError?: string; photoReport?: PhotoReport; engagement?: unknown };
+export type PhotoMessage = { text: string; id?: string; photos?: StagedPhoto[]; videos?: StagedVideo[]; photoError?: string; videoError?: string; photoReport?: PhotoReport; videoReport?: PhotoReport; engagement?: unknown };
 
 export function mediaRoot() {
   return path.resolve(process.env.LEAD_MEDIA_DIR || path.join(process.cwd(), 'data', 'lead-media'));

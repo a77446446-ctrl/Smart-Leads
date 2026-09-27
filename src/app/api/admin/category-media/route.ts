@@ -13,12 +13,12 @@ export async function POST(request: Request) {
   if (request.headers.get('content-type')?.split(';')[0].trim() !== 'application/json') return NextResponse.json({ error: 'Ожидался JSON' }, { status: 415, headers });
   let input;
   try {
-    input = await readBoundedJson(request, 1024) as { categoryId?: unknown; capturePhotos?: unknown };
-    if (!input || typeof input.categoryId !== 'string' || input.categoryId.length > 100 || typeof input.capturePhotos !== 'boolean') throw new Error();
-  } catch { return NextResponse.json({ error: 'Некорректные настройки фотографий' }, { status: 400, headers }); }
+    input = await readBoundedJson(request, 1024) as { categoryId?: unknown; capturePhotos?: unknown; captureVideos?: unknown };
+    if (!input || typeof input.categoryId !== 'string' || input.categoryId.length > 100 || typeof input.capturePhotos !== 'boolean' || (input.captureVideos !== undefined && typeof input.captureVideos !== 'boolean')) throw new Error();
+  } catch { return NextResponse.json({ error: 'Некорректные настройки медиа' }, { status: 400, headers }); }
   try {
-    const result = await prisma.category.updateMany({ where: { id: input.categoryId as string }, data: { capturePhotos: input.capturePhotos as boolean } });
+    const result = await prisma.category.updateMany({ where: { id: input.categoryId as string }, data: { capturePhotos: input.capturePhotos as boolean, ...(input.captureVideos === undefined ? {} : { captureVideos: input.captureVideos as boolean }) } });
     if (!result.count) return NextResponse.json({ error: 'Категория не найдена' }, { status: 404, headers });
-    return NextResponse.json({ capturePhotos: input.capturePhotos }, { headers });
-  } catch { return NextResponse.json({ error: 'Не удалось сохранить настройку фотографий' }, { status: 503, headers }); }
+    return NextResponse.json({ capturePhotos: input.capturePhotos, captureVideos: input.captureVideos }, { headers });
+  } catch { return NextResponse.json({ error: 'Не удалось сохранить настройку медиа' }, { status: 503, headers }); }
 }

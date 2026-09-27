@@ -2,7 +2,7 @@ import type { Prisma } from '@prisma/client';
 import { normalizeEngagement } from '@/lib/lead-engagement';
 import { cleanLeadText } from '@/lib/lead-display';
 import { publicationExpiresAt, type PhotoMessage } from '@/lib/lead-media';
-import { attachLeadPhotos, discardStagedPhotos } from './lead-media';
+import { attachLeadPhotos, attachLeadVideos, discardStagedPhotos } from './lead-media';
 import { prisma } from '@/lib/prisma';
 import { APPLICATION_THEME_SETTING_KEY, isApplicationThemeId } from '@/lib/application-theme';
 import { classifyLeadCategory } from '@/lib/lead-category';
@@ -38,6 +38,10 @@ export async function selectMessageProcessor(legacy: MessageProcessor): Promise<
         const report = message.photoReport;
         log(logs, `[${_chatTitle}] Фото MAX: сбор ${report.enabled ? 'включён' : 'выключен'}; сообщений: ${report.messages}; найдено фото: ${report.found}; временных файлов: ${report.saved}; ошибок фото: ${report.errors}`, report.errors ? 'error' : 'info');
       }
+      if (message.videoReport) {
+        const report = message.videoReport;
+        log(logs, `[${_chatTitle}] Видео MAX: найдено ${report.found}; сохранено ${report.saved}; ошибок ${report.errors}`, report.errors ? 'error' : 'info');
+      }
       const original = message.text.replace(/\u0000/g, '').trim();
       const engagement = normalizeEngagement(message.engagement, parseAll);
       const publishedAt = engagement?.publishedAt ? new Date(engagement.publishedAt) : undefined;
@@ -58,6 +62,11 @@ export async function selectMessageProcessor(legacy: MessageProcessor): Promise<
           if (message.photoError) log(logs, message.photoError, 'error');
           try { await attachLeadPhotos(existing.id, message); }
           catch { log(logs, 'Не удалось дополнить существующее сообщение фотографиями', 'error'); }
+        }
+        if (existing.sourceChat === chatUrl && (!existing.expiresAt || existing.expiresAt.getTime() > Date.now()) && categories.some(category => category.id === existing.categoryId && category.captureVideos)) {
+          if (message.videoError) log(logs, message.videoError, 'error');
+          try { await attachLeadVideos(existing.id, message); }
+          catch { log(logs, 'Не удалось дополнить существующее сообщение видео', 'error'); }
         }
         return false;
       }
@@ -108,6 +117,11 @@ export async function selectMessageProcessor(legacy: MessageProcessor): Promise<
         if (message.photoError) log(logs, message.photoError, 'error');
         try { await attachLeadPhotos(lead.id, message); }
         catch (error) { log(logs, 'Текст сохранён, фотографии пока недоступны: ' + safeParserError(error), 'error'); }
+      }
+      if (category.captureVideos) {
+        if (message.videoError) log(logs, message.videoError, 'error');
+        try { await attachLeadVideos(lead.id, message); }
+        catch (error) { log(logs, 'Текст сохранён, видео пока недоступно: ' + safeParserError(error), 'error'); }
       }
       return true;
     } catch (error) {
