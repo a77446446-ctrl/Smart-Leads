@@ -62,6 +62,14 @@ test('изменение счётчиков не создаёт новый кл�
   }
 });
 
+test('повтор рекламы из другого чата и с иной датой остаётся одной карточкой', () => {
+  const first = { rawText: 'Дарим подарки\nПодробности по ссылке', sourceChat: 'max.ru/chat-a', sourceEngagement: { show: true, publishedAt: '2026-09-26T08:00:00.000Z' } };
+  const second = { ...first, sourceChat: 'max.ru/chat-b', sourceEngagement: { show: true, publishedAt: '2026-09-27T08:00:00.000Z' } };
+  assert.equal(uniqueLeadCards([second, first]).length, 1);
+  const withPhoto = { ...first, media: [{ id: 'original-photo' }] };
+  assert.deepEqual(uniqueLeadCards([second, withPhoto])[0].media, withPhoto.media);
+});
+
 // Исполняем реальные TSX-компоненты через React SSR, без подмены их разметки.
 const require = createRequire(import.meta.url);
 const root = fileURLToPath(new URL('../', import.meta.url));

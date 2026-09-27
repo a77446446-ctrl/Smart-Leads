@@ -26,6 +26,13 @@ class HistoryTests(unittest.TestCase):
             self.assertEqual(rows[1]['engagement']['publishedAt'], '2026-09-26T05:00:00.000Z')
             self.assertTrue(page.evaluate('''() => {const n=document.querySelector('.scrollListScrollable');
               return n.scrollHeight-n.clientHeight-n.scrollTop < 8}'''))
+            page.set_content('''<div class="history"><div class="scrollListScrollable"><div class="scrollListContent">
+              <div data-index="4"><div class="messageWrapper"><div class="bubbleContent">
+              <span class="text">Дарим подарки</span><span class="meta">12:00</span>
+              </div></div></div></div></div></div>''')
+            rows = page.evaluate(DOM_SCRIPT)
+            self.assertEqual(rows[0]['text'], 'Дарим подарки')
+            self.assertIsNone(rows[0]['engagement'].get('publishedAt'))
             browser.close()
 
     def test_reaction_canvas_is_loaded_after_scroll_and_scaled_on_high_dpi(self):
@@ -47,6 +54,15 @@ class HistoryTests(unittest.TestCase):
             self.assertTrue(rows[0]['engagement']['reactions'][0]['image'].startswith('data:image/png;base64,'))
             self.assertEqual(rows[0]['engagement']['reactions'][1]['emoji'], '👍')
             self.assertEqual(rows[0]['engagement']['publishedAt'], '2026-09-26T05:00:00.000Z')
+            page.set_content('''<div class="history"><div data-index="7"><div class="messageWrapper">
+              <div class="bubbleContent"><span class="text">Новость</span>
+              <button class="reaction"><div class="animoji"><canvas width="20" height="20"></canvas></div>
+              <span class="counter">5</span></button></div></div></div></div>
+              <script>const c=document.querySelector('canvas');const ctx=c.getContext('2d');
+              ctx.fillStyle='red';ctx.fillRect(0,0,20,20);c.toDataURL=()=>{throw Error('blocked')}</script>''')
+            fallback_rows = [{'text': 'Новость', 'domIndex': '7', 'engagement': {'body': 'Новость'}}]
+            enrich_engagement(page, fallback_rows)
+            self.assertTrue(fallback_rows[0]['engagement']['reactions'][0]['image'].startswith('data:image/png;base64,'))
             browser.close()
 
 if __name__ == '__main__':

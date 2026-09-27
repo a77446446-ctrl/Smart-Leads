@@ -39,12 +39,15 @@
       engagement: { body: content, reactions: [], time, publishedAt } });
   }
   // При виртуализации начало списка бывает без разделителя даты.
-  const startDay = firstDivider ? new Date(firstDivider[0], firstDivider[1] - 1, firstDivider[2] - 1)
-    : new Date(today.getFullYear(), today.getMonth(), today.getDate());
-  for (const row of rows) {
-    if (row.engagement.publishedAt) break;
-    const time = row.engagement.time;
-    if (time) row.engagement.publishedAt = new Date([startDay.getFullYear(), String(startDay.getMonth()+1).padStart(2,'0'), String(startDay.getDate()).padStart(2,'0')].join('-')+'T'+time.padStart(5,'0')+':00+03:00').toISOString();
+  // Без разделителя даты нельзя приписывать старому посту сегодняшнее число:
+  // завтра тот же пост получит новый отпечаток и повторно попадёт в ленту.
+  if (firstDivider) {
+    const startDay = new Date(firstDivider[0], firstDivider[1] - 1, firstDivider[2] - 1);
+    for (const row of rows) {
+      if (row.engagement.publishedAt) break;
+      const time = row.engagement.time;
+      if (time) row.engagement.publishedAt = new Date([startDay.getFullYear(), String(startDay.getMonth()+1).padStart(2,'0'), String(startDay.getDate()).padStart(2,'0')].join('-')+'T'+time.padStart(5,'0')+':00+03:00').toISOString();
+    }
   }
   return rows.slice(-100);
 }

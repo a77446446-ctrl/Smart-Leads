@@ -77,16 +77,22 @@ export function currentLeadContentKey(lead: { rawText: string; phone?: string | 
 }
 
 /** Старые записи остаются в БД вместе с покупками; в списке показываем одну копию. */
-export function uniqueLeadCards<T extends { rawText: string; phone?: string | null; sourceChat?: string | null; sourceEngagement?: unknown }>(leads: T[]): T[] {
-  const seen = new Set<string>();
-  return leads.filter((lead) => {
-    if (!cleanLeadText(lead.rawText)) return true;
-    const source = lead.sourceEngagement as { show?: boolean; publishedAt?: string } | null;
-    const key = source?.show && source.publishedAt
-      ? JSON.stringify([lead.sourceChat, source.publishedAt, currentLeadContentKey(lead)])
-      : currentLeadContentKey(lead);
-    if (seen.has(key)) return false;
-    seen.add(key);
-    return true;
-  });
+export function uniqueLeadCards<T extends { rawText: string; phone?: string | null; media?: { id: string }[] }>(leads: T[]): T[] {
+  const positions = new Map<string, number>();
+  const visible: T[] = [];
+  for (const lead of leads) {
+    if (!cleanLeadText(lead.rawText)) { visible.push(lead); continue; }
+    // Старая неверная дата или повторная публикация из другого чата не должна
+    // занимать несколько карточек с одинаковым содержимым в текущей ленте.
+    const key = currentLeadContentKey(lead);
+    const previous = positions.get(key);
+    if (previous === undefined) {
+      positions.set(key, visible.length);
+      visible.push(lead);
+    } else if ((lead.media?.length || 0) > (visible[previous].media?.length || 0)) {
+      // Для одинакового текста оставляем версию с фотографиями.
+      visible[previous] = lead;
+    }
+  }
+  return visible;
 }

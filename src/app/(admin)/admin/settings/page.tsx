@@ -74,6 +74,24 @@ interface Chat {
   lastParsedAt?: string | null;
 }
 
+type ParserLog = { time: string; msg: string; type: 'info' | 'success' | 'error' };
+
+function readParserLogs(value: unknown): ParserLog[] {
+  if (!Array.isArray(value)) return [];
+  const fallbackTime = new Date().toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' });
+  return value.slice(-50).reverse().flatMap((entry): ParserLog[] => {
+    if (typeof entry === 'string') return [{ time: fallbackTime, msg: entry.slice(0, 500), type: 'info' }];
+    if (!entry || typeof entry !== 'object') return [];
+    const row = entry as Record<string, unknown>;
+    if (typeof row.msg !== 'string') return [];
+    return [{
+      time: typeof row.time === 'string' ? row.time.slice(0, 20) : fallbackTime,
+      msg: row.msg.slice(0, 500),
+      type: row.type === 'success' || row.type === 'error' ? row.type : 'info',
+    }];
+  });
+}
+
 export default function SettingsPage() {
   const [mounted, setMounted] = useState(false);
   const [loading, setLoading] = useState(true);
@@ -259,13 +277,7 @@ export default function SettingsPage() {
             try {
               const loadedLogs = JSON.parse(settingsMap['sync_logs']);
               if (Array.isArray(loadedLogs) && loadedLogs.length > 0) {
-                let newLogs = [];
-                if (typeof loadedLogs[0] === 'string') {
-                  const fallbackTime = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-                  newLogs = [...loadedLogs].reverse().map((msg: string) => ({ time: fallbackTime, msg, type: 'info' as const }));
-                } else {
-                  newLogs = [...loadedLogs].reverse();
-                }
+                const newLogs = readParserLogs(loadedLogs);
                 setLogs(prev => {
                   const merged = [...prev];
                   // Keep local-only logs (like proxy checks) that are newer than the DB logs
@@ -337,15 +349,7 @@ export default function SettingsPage() {
         try {
           const loadedLogs = JSON.parse(settingsMap['sync_logs']);
           if (Array.isArray(loadedLogs) && loadedLogs.length > 0) {
-            let newLogs = [];
-            if (typeof loadedLogs[0] === 'string') {
-              // Legacy format
-              const fallbackTime = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-              newLogs = [...loadedLogs].reverse().map((msg: string) => ({ time: fallbackTime, msg, type: 'info' as const }));
-            } else {
-              // New format
-              newLogs = [...loadedLogs].reverse();
-            }
+            const newLogs = readParserLogs(loadedLogs);
             setLogs(newLogs.slice(0, 50));
           }
         } catch(e) {}
@@ -638,15 +642,9 @@ export default function SettingsPage() {
       }
       const data = await res.json();
       
-      if (data.logs && data.logs.length > 0 && !data.skipped) {
+      if (!data.skipped) {
+        const newLogs = readParserLogs(data.logs);
         setLogs(prev => {
-          let newLogs = [];
-          if (typeof data.logs[0] === 'string') {
-            const time = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-            newLogs = [...data.logs].reverse().map((msg: string) => ({ time, msg, type: data.success ? 'info' as const : 'error' as const }));
-          } else {
-            newLogs = [...data.logs].reverse();
-          }
           return [...newLogs, ...prev].slice(0, 50);
         });
       }
