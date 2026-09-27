@@ -8,7 +8,7 @@ def enrich_engagement(page, messages):
     try:
         for message, engagement in zip(messages, page.evaluate(DOM_SCRIPT, messages)):
             if engagement:
-                message['engagement'] = engagement
+                message['engagement'] = {**message.get('engagement', {}), **engagement}
     except Exception:
         # Недоступная статистика не останавливает получение текста и фотографий.
         pass

@@ -40,15 +40,19 @@ export async function selectMessageProcessor(legacy: MessageProcessor): Promise<
       }
       const original = message.text.replace(/\u0000/g, '').trim();
       const engagement = normalizeEngagement(message.engagement, parseAll);
+      const publishedAt = engagement?.publishedAt ? new Date(engagement.publishedAt) : undefined;
       const body = engagement?.body || cleanLeadText(original);
       if (isTechnicalParserMessage(original)) return false;
-      const fingerprint = buildParserMessageFingerprint(chatUrl, message.id, original);
-      const contentFingerprint = buildLeadContentFingerprint({ rawText: original });
+      // В режиме «Всё» одинаковые тексты разных публикаций остаются отдельными постами.
+      const sourcePublication = parseAll && publishedAt;
+      const fingerprint = buildParserMessageFingerprint(chatUrl, message.id, sourcePublication ? publishedAt.toISOString() + '\n' + body : original);
+      const legacyContentFingerprint = buildLeadContentFingerprint({ rawText: original });
+      const contentFingerprint = sourcePublication ? fingerprint : legacyContentFingerprint;
       if (publicAccess && await prisma.parserSeenMessage.findUnique({ where: { fingerprint } })) return false;
-      const existing = await prisma.lead.findFirst({ where: { OR: [{ fingerprint }, { contentFingerprint }, { rawText: original, sourceChat: chatUrl }] }, select: { id: true, categoryId: true, sourceChat: true, expiresAt: true } });
+      const existing = await prisma.lead.findFirst({ where: { OR: [{ fingerprint }, { contentFingerprint }, ...(sourcePublication ? [{ contentFingerprint: legacyContentFingerprint, sourceChat: chatUrl }] : [{ rawText: original, sourceChat: chatUrl }])] }, select: { id: true, categoryId: true, sourceChat: true, expiresAt: true } });
       if (existing) {
         if (existing.sourceChat === chatUrl && (!existing.expiresAt || existing.expiresAt.getTime() > Date.now()) && engagement) {
-          await prisma.lead.update({ where: { id: existing.id }, data: { sourceEngagement: engagement } });
+          await prisma.lead.update({ where: { id: existing.id }, data: { sourceEngagement: engagement, ...(publishedAt ? { publishedAt } : {}), ...(sourcePublication ? { fingerprint, contentFingerprint } : {}) } });
         }
         if (existing.sourceChat === chatUrl && (!existing.expiresAt || existing.expiresAt.getTime() > Date.now()) && categories.some(category => category.id === existing.categoryId && category.capturePhotos)) {
           if (message.photoError) log(logs, message.photoError, 'error');
@@ -85,6 +89,7 @@ export async function selectMessageProcessor(legacy: MessageProcessor): Promise<
         title: original.split(/\r?\n/).find(line => line.trim())!.trim().slice(0, 200),
         rawText: original, city: String(metadata?.city || 'Не указан').slice(0, 100),
         ...(engagement ? { sourceEngagement: engagement } : {}),
+        ...(publishedAt ? { publishedAt } : {}),
         categoryId: category.id, sourceChat: chatUrl, fingerprint, contentFingerprint,
         allowContactless: publicAccess || parseAll, publicationTheme: theme,
         accessMode: publicAccess ? 'PUBLIC' : 'CONTACT', price: publicAccess ? 0 : category.leadPrice,

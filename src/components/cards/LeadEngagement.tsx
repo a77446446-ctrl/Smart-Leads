@@ -1,4 +1,4 @@
-import { Clock, Eye, MessageCircle, Smile } from 'lucide-react';
+import { Clock, Eye, MessageCircle } from 'lucide-react';
 import type { LeadEngagement as Engagement } from '@/lib/lead-engagement';
 
 export function LeadEngagement({ value }: { value?: Engagement | null }) {
@@ -10,7 +10,7 @@ export function LeadEngagement({ value }: { value?: Engagement | null }) {
           // Маленький PNG извлечён из canvas MAX; внешних запросов здесь нет.
           // eslint-disable-next-line @next/next/no-img-element
           ? <img src={reaction.image} width={20} height={20} alt="Реакция" />
-          : reaction.emoji ? <span className="text-base leading-none">{reaction.emoji}</span> : <Smile size={16} aria-label="Реакция" />}
+          : reaction.emoji ? <span className="text-base leading-none">{reaction.emoji}</span> : <span className="font-normal">Реакция</span>}
         {reaction.count}
       </span>)}
     </div>

@@ -160,7 +160,8 @@ class PhotoTests(unittest.TestCase):
                     else:
                         route.fulfill(status=200, content_type='text/html; charset=utf-8', body=html)
                 page.route('**/*', respond)
-                page.goto('https://max.ru/test-fixture', wait_until='networkidle')
+                page.goto('https://max.ru/test-fixture', wait_until='domcontentloaded')
+                page.wait_for_function("document.querySelector('img').complete && document.querySelector('#third').style.backgroundImage.includes('blob:')")
                 messages = [{'text': 'Фотография авто', 'id': '1'}]
                 collector.enrich(messages)
                 self.assertEqual(len(messages[0]['photos']), 3)
@@ -172,7 +173,7 @@ class PhotoTests(unittest.TestCase):
     def test_files_and_failure_isolation(self):
         data = b"\xff\xd8\xff" + b"x" * 20
         with tempfile.TemporaryDirectory(prefix="smart-leads-photos-") as root, patch.dict(os.environ, {"PARSER_CAPTURE_PHOTOS": "1", "LEAD_MEDIA_DIR": root}):
-            page = SimpleNamespace(on=lambda *args: None, evaluate=lambda *args: [{"urls": ["https://cdn.example/photo"]}, {"urls": []}])
+            page = SimpleNamespace(on=lambda *args: None, evaluate=lambda script, messages: [{"urls": ["https://cdn.example/photo"] if message.get('id') == '1' else []} for message in messages])
             collector = MessagePhotos(page)
             collector.responses["https://cdn.example/photo"] = SimpleNamespace(body=lambda: data)
             messages = [{"text": "Авто", "id": "1"}, {"text": "Спорт", "id": "2"}]

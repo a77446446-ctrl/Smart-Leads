@@ -35,6 +35,14 @@ async (messages) => {
     const candidates = Array.from(document.querySelectorAll(candidateSelector));
     const text = normalize(message.text.split('\n\nКонтакты (ссылки): ')[0]);
     if (!text) return { urls: [] };
+    // Индекс принадлежит одной публикации текущей истории MAX.
+    if (message.domIndex != null) {
+      const rows = Array.from(document.querySelectorAll('.history [data-index]'))
+        .filter(node => node.getAttribute('data-index') === message.domIndex);
+      const wrappers = rows.flatMap(node => Array.from(node.querySelectorAll('.messageWrapper')));
+      if (wrappers.length === 1) return { container: wrappers[0], ...inspect(wrappers[0]) };
+      if (wrappers.length > 1) return { urls: [], error: 'Не удалось однозначно связать фотографии с сообщением MAX' };
+    }
     // Счётчики меняются во время загрузки фото. Сопоставляем стабильное тело сообщения,
     // сохраняя границу messageWrapper и проверку единственности совпадения.
     const stableBody = message.engagement?.body?.split('\n\nКонтакты (ссылки): ')[0];
@@ -43,7 +51,9 @@ async (messages) => {
         const body = node.querySelector('.bubbleContent > .text');
         return body && textOf(body) === normalize(stableBody);
       });
-      if (wrappers.length === 1) return { container: wrappers[0], ...inspect(wrappers[0]) };
+      const indexed = wrappers.filter(node => message.domIndex != null && node.closest('[data-index]')?.getAttribute('data-index') === message.domIndex);
+      const matched = indexed.length === 1 ? indexed : wrappers;
+      if (matched.length === 1) return { container: matched[0], ...inspect(matched[0]) };
       if (wrappers.length > 1) return { urls: [], error: 'Не удалось однозначно связать фотографии с сообщением MAX' };
     }
     const byId = message.id ? candidates.filter(node => visible(node)
@@ -74,7 +84,7 @@ async (messages) => {
   const groups = [];
   for (const message of messages) {
     let state = locate(message);
-    const messageDeadline = Math.min(deadline, Date.now() + 2500);
+    const messageDeadline = Math.min(deadline, Date.now() + 6000);
     while (state.pending?.length && Date.now() < messageDeadline) {
       // Прокручиваем только однозначно найденное вложение; не открываем медиапросмотрщик.
       state.pending[0].scrollIntoView({ block: 'center', inline: 'nearest', behavior: 'instant' });

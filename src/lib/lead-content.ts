@@ -77,11 +77,14 @@ export function currentLeadContentKey(lead: { rawText: string; phone?: string | 
 }
 
 /** Старые записи остаются в БД вместе с покупками; в списке показываем одну копию. */
-export function uniqueLeadCards<T extends { rawText: string; phone?: string | null }>(leads: T[]): T[] {
+export function uniqueLeadCards<T extends { rawText: string; phone?: string | null; sourceChat?: string | null; sourceEngagement?: unknown }>(leads: T[]): T[] {
   const seen = new Set<string>();
   return leads.filter((lead) => {
     if (!cleanLeadText(lead.rawText)) return true;
-    const key = currentLeadContentKey(lead);
+    const source = lead.sourceEngagement as { show?: boolean; publishedAt?: string } | null;
+    const key = source?.show && source.publishedAt
+      ? JSON.stringify([lead.sourceChat, source.publishedAt, currentLeadContentKey(lead)])
+      : currentLeadContentKey(lead);
     if (seen.has(key)) return false;
     seen.add(key);
     return true;

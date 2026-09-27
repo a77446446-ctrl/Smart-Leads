@@ -152,7 +152,7 @@ export const LeadCard = ({ lead, onBuy, isPurchased, highlighted }: LeadCardProp
           </div>
           <div title="Добавлено в приложение" className="flex items-center text-[#666] text-[11px] font-medium gap-1 ml-2 shrink-0">
             <Clock size={12} aria-hidden="true" />
-            {formatLeadCreatedAt(lead.createdAt)}
+            {formatLeadCreatedAt(isPublic ? lead.publishedAt || lead.createdAt : lead.createdAt)}
           </div>
         </div>
 

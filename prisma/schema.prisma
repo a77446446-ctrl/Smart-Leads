@@ -108,6 +108,7 @@ model Lead {
   title         String
   rawText       String
   sourceEngagement Json?
+  publishedAt   DateTime      @default(now())
   phone         String?
   allowContactless Boolean     @default(false)
   accessMode    String         @default("CONTACT")
@@ -134,6 +135,7 @@ model Lead {
   @@index([categoryId, status, deletedAt, createdAt])
   @@index([contentFingerprint, duplicateOfId])
   @@index([expiresAt])
+  @@index([publishedAt, createdAt])
   @@index([createdAt])
   @@index([deletedAt])
 }

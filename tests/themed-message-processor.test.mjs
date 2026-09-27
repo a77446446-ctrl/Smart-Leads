@@ -28,7 +28,7 @@ async function harness({ theme = 'news', categories = rules, aiFails = false, se
     parserSeenMessage: { findUnique: async () => seen ? { fingerprint: 'seen' } : null },
     setting: { findUnique: async () => { if (settingFails) throw new Error('Ошибка настроек'); return theme === null ? null : { value: theme }; } },
     category: { findMany: async () => categories.filter(c => c.active), upsert: async () => categories.find(c => c.slug === 'other') ?? ({ id: 'other', slug: 'other', leadPrice: 50 }) },
-    lead: { findFirst: async ({ where }) => saved.find(row => where.OR.some(condition => Object.entries(condition).every(([key, value]) => row[key] === value))) ?? null, create: insert },
+    lead: { findFirst: async ({ where }) => saved.find(row => where.OR.some(condition => Object.entries(condition).every(([key, value]) => row[key] === value))) ?? null, create: insert, update: async ({ where, data }) => { const row = saved.find(item => item.id === where.id); Object.assign(row, data); return row; } },
   };
   const processor = loadTs('src/services/themed-message-processor.ts', {
     '@/lib/lead-engagement': engagement,
@@ -49,7 +49,7 @@ async function harness({ theme = 'news', categories = rules, aiFails = false, se
   });
   const legacy = async () => 'legacy';
   const run = await processor.selectMessageProcessor(legacy);
-  return { run: (text, all = false, id = '1', photos = [], photoError, photoReport) => run({ text, id, photos, photoError, photoReport }, 'https://max.ru/source', 'Источник', all, logs), selected: run, legacy, saved, delivered, logs, attachments, discarded, analysisCount: () => analysisCount };
+  return { run: (text, all = false, id = '1', photos = [], photoError, photoReport) => run({ ...(typeof text === 'object' ? text : { text }), id, photos, photoError, photoReport }, 'https://max.ru/source', 'Источник', all, logs), selected: run, legacy, saved, delivered, logs, attachments, discarded, analysisCount: () => analysisCount };
 }
 
 test('без темы используется тот же старый обработчик; ошибки настройки не включают другой режим', async () => {
@@ -181,4 +181,20 @@ test('отчёт фотографий виден при выключенном �
     assert.match(h.logs.at(-1).msg, /найдено фото: 0; временных файлов: 0/);
     assert.equal(h.saved.length, 1);
   }
+});
+
+
+test('Всё сохраняет исходную дату, повтор обновляет ту же новость, следующий пост с тем же текстом остаётся отдельным', async () => {
+  const h = await harness({ categories: [...rules, { id: 'other', slug: 'other', active: true, capturePhotos: true }] });
+  const text = 'Новость с фотографией';
+  const publication = publishedAt => ({ text, engagement: { body: text, publishedAt, reactions: [{ count: '3', emoji: '👍' }] } });
+  const first = publication('2026-09-25T08:00:00.000Z');
+  assert.equal(await h.run(first, true, undefined), true);
+  assert.equal(h.saved[0].publishedAt.toISOString(), first.engagement.publishedAt);
+  const photos = [{ key: 'photo', mimeType: 'image/jpeg' }];
+  assert.equal(await h.run(first, true, undefined, photos), false);
+  assert.equal(h.saved.length, 1);
+  assert.deepEqual(h.attachments.at(-1).photos, photos);
+  assert.equal(await h.run(publication('2026-09-26T08:00:00.000Z'), true, ''), true);
+  assert.equal(h.saved.length, 2);
 });

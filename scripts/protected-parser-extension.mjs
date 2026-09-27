@@ -39,6 +39,10 @@ export function originalParserSource(source) {
 export const ORIGINAL_WORKER_NORMALIZED_SHA256 = '0498e26e289da8005d6972bfdea41a653a4aa56c50c297a5233b386e2fff57e5';
 export function originalWorkerSource(source) {
   source = source.replace(/\r\n/g, '\n');
+  // 27.09.2026: последовательное чтение конца истории, без изменения входа и прокси.
+  source = source.replace('from parser_history import latest_messages\n', '');
+  source = source.replace('            title = extract_title(page)\n            messages = latest_messages(page, extract_messages)',
+    '            human_scroll(page)\n            title = extract_title(page)\n            messages = extract_messages(page)');
   // 26.09.2026: пользователь запросил отдельное отображение реакций и счётчиков MAX.
   for (const line of ['from parser_engagement import enrich_engagement', '            enrich_engagement(page, messages)']) {
     if (source.split(line + '\n').length !== 2) throw new Error('Не совпадает точка сбора статистики MAX');

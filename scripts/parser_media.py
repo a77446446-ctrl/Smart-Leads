@@ -97,15 +97,19 @@ class MessagePhotos:
             directory = root / "staging"
             directory.mkdir(parents=True, exist_ok=True, mode=0o700)
             usage = sum(file.stat().st_size for file in directory.iterdir() if file.is_file())
-            groups = self.page.evaluate(DOM_SCRIPT, messages)
-            report["found"] = sum(len(group["urls"][:6]) for group in groups)
             total = 0
             started = time.monotonic()
-            for message, group in zip(messages, groups):
+            # Байты сохраняются до следующей прокрутки, пока MAX не отозвал blob.
+            for message in reversed(messages):
+                if time.monotonic() - started > 45:
+                    message['photoError'] = 'Достигнут лимит ожидания фото за проход; текст сохранён'
+                    continue
+                group = self.page.evaluate(DOM_SCRIPT, [message])[0]
+                report['found'] += len(group['urls'][:6])
                 if group.get("error"):
                     message["photoError"] = group["error"]
                 for url in group["urls"][:6]:
-                    if usage >= MAX_STAGING_BYTES or total >= MAX_BATCH_BYTES or time.monotonic() - started > 8:
+                    if usage >= MAX_STAGING_BYTES or total >= MAX_BATCH_BYTES:
                         message["photoError"] = "Достигнут лимит сбора фотографий за один проход"
                         break
                     try:

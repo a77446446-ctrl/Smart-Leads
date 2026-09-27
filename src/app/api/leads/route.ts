@@ -58,7 +58,7 @@ export async function GET(request: Request) {
     const leads = await withRetry(() => prisma.lead.findMany({
       where,
       take: databaseTake,
-      orderBy: { createdAt: 'desc' },
+      orderBy: [{ publishedAt: 'desc' }, { createdAt: 'desc' }, { id: 'desc' }],
       select: {
         id: true,
         title: true,
@@ -76,6 +76,7 @@ export async function GET(request: Request) {
         price: true,
         status: true,
         createdAt: true,
+        publishedAt: true,
         category: {
           select: { id: true, name: true, slug: true, paymentMode: true, imageUrl: true },
         },

@@ -3,7 +3,7 @@ import { cleanLeadText } from './lead-display.ts';
 export type LeadEngagement = {
   body: string; show: boolean;
   reactions: { count: string; emoji?: string; image?: string }[];
-  views?: string; time?: string; comments?: string;
+  views?: string; time?: string; comments?: string; publishedAt?: string;
 };
 
 /** Никаких внешних URL или HTML: только ограниченные счётчики и маленькие PNG. */
@@ -24,6 +24,9 @@ export function normalizeEngagement(value: unknown, show: boolean): LeadEngageme
     reactions.push(reaction);
   }
   return { body: row.body.replace(/\u0000/g, '').trim(), show, reactions,
+    ...(typeof row.publishedAt === 'string' && /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z$/.test(row.publishedAt)
+      && Number.isFinite(Date.parse(row.publishedAt)) && Date.parse(row.publishedAt) <= Date.now() + 300000
+      ? { publishedAt: row.publishedAt } : {}),
     ...(show && count(row.views) ? { views: count(row.views) } : {}),
     ...(show && count(row.comments) ? { comments: count(row.comments) } : {}),
     ...(show && typeof row.time === 'string' && /^(?:[01]?\d|2[0-3]):[0-5]\d$/.test(row.time) ? { time: row.time } : {}),

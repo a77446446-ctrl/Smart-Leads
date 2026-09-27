@@ -12,10 +12,13 @@ export async function backfillLeadIdentities(db: Pick<PrismaClient, 'lead'>) {
       ...(cursor ? { where: { id: { gt: cursor } } } : {}),
       orderBy: { id: 'asc' },
       take: 200,
-      select: { id: true, rawText: true, phone: true, contentFingerprint: true, duplicateOfId: true },
+      select: { id: true, rawText: true, phone: true, contentFingerprint: true, duplicateOfId: true, sourceEngagement: true },
     });
     if (!batch.length) return { indexed, duplicates };
     for (const lead of batch) {
+      const source = lead.sourceEngagement as { show?: boolean; publishedAt?: string } | null;
+      // Публикации режима «Всё» различаются источником и исходной датой.
+      if (source?.show && source.publishedAt && lead.contentFingerprint) continue;
       const contentFingerprint = buildLeadContentFingerprint(lead);
       if (lead.contentFingerprint === contentFingerprint && !lead.duplicateOfId) continue;
       try {
