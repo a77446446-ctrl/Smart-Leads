@@ -1,4 +1,5 @@
-﻿FROM node:22-bookworm
+# syntax=docker/dockerfile:1
+FROM node:22-bookworm
 
 WORKDIR /app
 
@@ -10,20 +11,20 @@ ENV VIRTUAL_ENV=/opt/venv
 RUN python3 -m venv $VIRTUAL_ENV
 ENV PATH="$VIRTUAL_ENV/bin:$PATH"
 
-# Копируем requirements.txt и ставим Python пакеты
+# Копируем requirements.txt и ставим Python пакеты с повторным использованием кэша.
 COPY requirements.txt ./
-RUN pip3 install --no-cache-dir -r requirements.txt
+RUN --mount=type=cache,target=/root/.cache/pip pip3 install -r requirements.txt
 
-# Устанавливаем браузеры для Playwright и системные зависимости
-RUN playwright install --with-deps chromium
+# На сервере парсер и вход запускают Chromium без графического интерфейса.
+# Скачиваем только headless shell и предпочитаем IPv4: IPv6 CDN недоступен на VPS.
+RUN NODE_OPTIONS=--dns-result-order=ipv4first playwright install --with-deps --only-shell chromium
 
-# Устанавливаем Node.js пакеты
+# Сохраняем кэш npm между сборками; аудит выполняется отдельно от деплоя.
 COPY package.json package-lock.json ./
-RUN npm ci
+RUN --mount=type=cache,target=/root/.npm npm ci --no-audit --no-fund --prefer-offline
 
 # Копируем проект и собираем
 COPY . .
-RUN npx prisma generate
 RUN npm run build
 
 EXPOSE 3000
