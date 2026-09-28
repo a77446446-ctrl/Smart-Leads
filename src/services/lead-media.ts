@@ -12,11 +12,11 @@ export async function photoCaptureEnvironment(): Promise<Record<string, string>>
   try {
     const theme = await prisma.setting.findUnique({ where: { key: APPLICATION_THEME_SETTING_KEY } });
     const enabled = theme && isApplicationThemeId(theme.value);
-    const categories = enabled ? await prisma.category.findMany({ where: { OR: [{ capturePhotos: true }, { captureVideos: true }] }, select: { capturePhotos: true, captureVideos: true } }) : [];
-    return { PARSER_CAPTURE_PHOTOS: categories.some(item => item.capturePhotos) ? '1' : '0', PARSER_CAPTURE_VIDEOS: categories.some(item => item.captureVideos) ? '1' : '0' };
+    const categories = enabled ? await prisma.category.findMany({ where: { capturePhotos: true }, select: { capturePhotos: true } }) : [];
+    return { PARSER_CAPTURE_PHOTOS: categories.length ? '1' : '0' };
   } catch {
     console.error('[МЕДИА] Не удалось прочитать настройки категорий');
-    return { PARSER_CAPTURE_PHOTOS: '0', PARSER_CAPTURE_VIDEOS: '0' };
+    return { PARSER_CAPTURE_PHOTOS: '0' };
   }
 }
 

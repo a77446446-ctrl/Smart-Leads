@@ -16,11 +16,11 @@ export function originalParserSource(source) {
     ].join(source.includes('\r\n') ? '\r\n' : '\n')],
     ['          .filter((item): item is WorkerResult[\'messages\'][number] => Boolean(item && typeof item.text === \'string\'))',
       '          .filter((item): item is { text: string; id?: string } => Boolean(item && typeof item.text === \'string\'))'],
-    ['  messages: Array<{ text: string; id?: string; photos?: StagedPhoto[]; videos?: StagedVideo[]; photoError?: string; videoError?: string; photoReport?: PhotoReport; videoReport?: PhotoReport; engagement?: unknown }>;',
+    ['  messages: Array<{ text: string; id?: string; photos?: StagedPhoto[]; photoError?: string; photoReport?: PhotoReport; engagement?: unknown }>;',
       '  messages: Array<{ text: string; id?: string }>;'],
     ['          expiresAt: null,', ''],
     ["import { photoCaptureEnvironment } from './lead-media';", ''],
-    ["import type { StagedPhoto, StagedVideo, PhotoReport } from '@/lib/lead-media';", ''],
+    ["import type { StagedPhoto, PhotoReport } from '@/lib/lead-media';", ''],
     ['  const photoEnvironment = await photoCaptureEnvironment();', ''],
     ['        ...photoEnvironment,', ''],
     ["import { selectMessageProcessor } from './themed-message-processor';", ''],
@@ -52,9 +52,5 @@ export function originalWorkerSource(source) {
     if (source.split(line + '\n').length !== 2) throw new Error('Не совпадает согласованное дополнение фотографий');
     source = source.replace(line + '\n', '');
   }
-  for (const line of ['from parser_video import MessageVideos', '            videos = MessageVideos(page)', '            videos.enrich(messages)']) {
-    if (source.split(line + '\n').length !== 2) throw new Error('Не совпадает точка сбора видео MAX');
-    source = source.replace(line + '\n', '');
-  }
-  return source.endsWith('\n') ? source.slice(0, -1) : source;
+  return source;
 }

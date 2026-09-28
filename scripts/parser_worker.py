@@ -21,7 +21,6 @@ from playwright.sync_api import sync_playwright
 
 from proxy_runtime import build_playwright_proxy
 from parser_media import MessagePhotos
-from parser_video import MessageVideos
 from parser_engagement import enrich_engagement
 from parser_history import latest_messages
 
@@ -315,7 +314,6 @@ def run_parser(session_id, chat_url):
             )
             page = context.new_page()
             photos = MessagePhotos(page)
-            videos = MessageVideos(page)
 
             # Загружаем SPA сразу с маршрутом чата: MAX читает hash при старте приложения.
             stage = "открытие целевого чата MAX"
@@ -334,7 +332,6 @@ def run_parser(session_id, chat_url):
             messages = latest_messages(page, extract_messages)
             save_session(target, context, {**meta, "proxy": None, "formatVersion": 2})
             photos.enrich(messages)
-            videos.enrich(messages)
             enrich_engagement(page, messages)
 
             empty_error = None

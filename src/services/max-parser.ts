@@ -22,7 +22,7 @@ import { aiService, type ProcessedLead } from './ai';
 import { selectMessageProcessor } from './themed-message-processor';
 import { saveParserChatResults } from './parser-chat-results';
 import { photoCaptureEnvironment } from './lead-media';
-import type { StagedPhoto, StagedVideo, PhotoReport } from '@/lib/lead-media';
+import type { StagedPhoto, PhotoReport } from '@/lib/lead-media';
 
 type ParserAccount = {
   id: string;
@@ -45,7 +45,7 @@ type WorkerStatus = 'OK' | 'EMPTY' | 'AUTH_REQUIRED' | 'RATE_LIMITED' | 'PROXY_E
 
 type WorkerResult = {
   title: string | null;
-  messages: Array<{ text: string; id?: string; photos?: StagedPhoto[]; videos?: StagedVideo[]; photoError?: string; videoError?: string; photoReport?: PhotoReport; videoReport?: PhotoReport; engagement?: unknown }>;
+  messages: Array<{ text: string; id?: string; photos?: StagedPhoto[]; photoError?: string; photoReport?: PhotoReport; engagement?: unknown }>;
   source_chat: string;
   status: WorkerStatus;
   error?: string;
