@@ -2,6 +2,15 @@ import { prisma } from '@/lib/prisma';
 
 type ChatResult = { url: string; lastRunLeadsCount: number | null; lastParsedAt: string | null };
 
+/** Промежуточный журнал доступен интерфейсу ещё до завершения всей очереди. */
+export async function saveParserProgress(logs: Array<{ time: string; msg: string; type: string }>) {
+  await prisma.setting.upsert({
+    where: { key: 'sync_logs' },
+    update: { value: JSON.stringify(logs) },
+    create: { key: 'sync_logs', value: JSON.stringify(logs) },
+  });
+}
+
 /** Обновляем только итоги имеющихся источников, сохраняя правки администратора. */
 export function mergeChatResults(value: string, results: ChatResult[]): string {
   const chats: unknown = JSON.parse(value);

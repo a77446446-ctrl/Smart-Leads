@@ -20,7 +20,8 @@ import { removeSourceChatLinks } from '@/lib/lead-source-link';
 import { createLeadWithDeliveries } from './bot-outbox';
 import { aiService, type ProcessedLead } from './ai';
 import { selectMessageProcessor } from './themed-message-processor';
-import { saveParserChatResults } from './parser-chat-results';
+import { saveParserChatResults, saveParserProgress } from './parser-chat-results';
+import { ParserWorkerProgress, stopParserWorker } from './parser-worker-progress';
 import { photoCaptureEnvironment } from './lead-media';
 import type { StagedPhoto, PhotoReport } from '@/lib/lead-media';
 
@@ -451,6 +452,7 @@ async function runPlaywrightParse(chatUrl: string, account: ParserAccount): Prom
     const sessionId = account.sessionFile.replace(/\.json$/i, '');
     const timeoutMs = positiveIntEnv('PARSER_WORKER_TIMEOUT_MS', 120_000, 30_000, 300_000);
     const outputLimit = 2 * 1024 * 1024;
+    const progress = new ParserWorkerProgress<WorkerResult>(chatUrl);
     let stdout = '';
     let stderr = '';
     let finished = false;
@@ -459,11 +461,13 @@ async function runPlaywrightParse(chatUrl: string, account: ParserAccount): Prom
       cwd: process.cwd(),
       shell: false,
       windowsHide: true,
+      detached: process.platform !== 'win32',
       stdio: ['ignore', 'pipe', 'pipe'],
       env: {
         ...process.env,
         ...photoEnvironment,
         PYTHONIOENCODING: 'utf-8',
+        PARSER_WORKER_TIMEOUT_MS: String(timeoutMs),
         PARSER_PROXY_URL: account.proxyUrl || 'direct',
         PARSER_SESSIONS_DIR: process.env.PARSER_SESSIONS_DIR || path.join(process.cwd(), 'sessions'),
       },
@@ -476,14 +480,15 @@ async function runPlaywrightParse(chatUrl: string, account: ParserAccount): Prom
       resolve(value);
     };
     const collect = (target: 'stdout' | 'stderr', chunk: Buffer | string) => {
+      if (finished) return;
       const current = target === 'stdout' ? stdout : stderr;
       const next = current + (typeof chunk === 'string' ? chunk : chunk.toString('utf8'));
       if (next.length > outputLimit) {
-        child.kill('SIGTERM');
-        finish(failedWorker(chatUrl, 'ERROR', `Превышен лимит ${target}`));
+        stopParserWorker(child);
+        finish(progress.recover() || failedWorker(chatUrl, 'ERROR', `Превышен лимит ${target}`));
         return;
       }
-      if (target === 'stdout') stdout = next;
+      if (target === 'stdout') { stdout = next; progress.collect(typeof chunk === 'string' ? chunk : chunk.toString('utf8')); }
       else stderr = next;
     };
     child.stdout.setEncoding('utf8');
@@ -494,7 +499,7 @@ async function runPlaywrightParse(chatUrl: string, account: ParserAccount): Prom
     child.once('close', (code) => {
       if (finished) return;
       if (code !== 0) {
-        finish(failedWorker(chatUrl, 'ERROR', stderr || `Worker завершился с кодом ${code}`));
+        finish(progress.recover() || failedWorker(chatUrl, 'ERROR', stderr || `Worker завершился с кодом ${code}`));
         return;
       }
       try {
@@ -516,12 +521,12 @@ async function runPlaywrightParse(chatUrl: string, account: ParserAccount): Prom
           error: typeof parsed.error === 'string' ? safeParserError(parsed.error) : undefined,
         });
       } catch (error) {
-        finish(failedWorker(chatUrl, 'ERROR', error));
+        finish(progress.recover() || failedWorker(chatUrl, 'ERROR', error));
       }
     });
     timeoutHandle = setTimeout(() => {
-      child.kill('SIGTERM');
-      finish(failedWorker(chatUrl, 'TIMEOUT', `Worker превысил ${timeoutMs} мс`));
+      stopParserWorker(child);
+      finish(progress.recover() || failedWorker(chatUrl, 'TIMEOUT', `Worker превысил ${timeoutMs} мс; этап: ${progress.stage}`));
     }, timeoutMs);
   });
 }
@@ -570,6 +575,8 @@ async function syncWithoutLease(leaseToken: string): Promise<SyncResult> {
       chat: chats[(cursor + offset) % chats.length],
     }));
     let accountIndex = 0;
+    pushLog(logs, `Начат проход: чатов ${selected.length}`);
+    await saveParserProgress(logs);
 
     for (const item of selected) {
       if (accounts.length === 0) break;
@@ -583,6 +590,8 @@ async function syncWithoutLease(leaseToken: string): Promise<SyncResult> {
         continue;
       }
       if (chatUrl !== originalUrl) item.chat.url = chatUrl;
+      pushLog(logs, `[${item.chat.name}] Начат разбор чата`);
+      await saveParserProgress(logs);
 
       let worker: WorkerResult | null = null;
       const maxAccountAttempts = Math.min(2, accounts.length);
@@ -598,11 +607,13 @@ async function syncWithoutLease(leaseToken: string): Promise<SyncResult> {
         }
         await recordAccountResult(account, worker);
         if (worker.status === 'OK' || worker.status === 'EMPTY') {
+          if (worker.status === 'OK' && worker.error) pushLog(logs, `[${item.chat.name}] ${worker.error}`);
           accountIndex = (accountIndex + 1) % accounts.length;
           break;
         }
         pushLog(logs, `[${item.chat.name}] ${account.name}: ${worker.status}${worker.error ? ` (${worker.error})` : ''}`);
         accounts.splice(accountIndex, 1);
+        await saveParserProgress(logs);
         worker = null;
       }
 
@@ -652,6 +663,8 @@ async function syncWithoutLease(leaseToken: string): Promise<SyncResult> {
       }
       const workerDetail = worker.status === 'EMPTY' && worker.error ? `; ${worker.error}` : '';
       pushLog(logs, `[${item.chat.name}] сообщений: ${worker.messages.length}, новых лидов: ${chatLeads}${workerDetail}`);
+      await saveChats([item.chat]);
+      await saveParserProgress(logs);
       await new Promise((resolve) => setTimeout(resolve, 3000));
     }
 

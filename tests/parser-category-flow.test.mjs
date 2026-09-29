@@ -33,7 +33,8 @@ function harness({ categories = rules, aiFailure = false, processed = null } = {
     '@/lib/redact-contact': contacts, '@/lib/lead-content': content, '@/lib/lead-moderation': moderation,
   });
   const api = loadTs('src/services/max-parser.ts', {
-    './parser-chat-results': { saveParserChatResults: async () => {} },
+    './parser-chat-results': { saveParserChatResults: async () => {}, saveParserProgress: async () => {} },
+    './parser-worker-progress': loadTs('src/services/parser-worker-progress.ts', {}),
     './lead-media': { photoCaptureEnvironment: async () => ({ PARSER_CAPTURE_PHOTOS: '0' }) },
     './themed-message-processor': { selectMessageProcessor: async legacy => legacy },
     '@/lib/prisma': { prisma }, '@/lib/parser-lease': {},

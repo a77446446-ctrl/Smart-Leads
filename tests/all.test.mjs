@@ -11,6 +11,7 @@ await import('./user-management.test.mjs');
 await import('./lead-date.test.mjs');
 await import('./lead-category.test.mjs');
 await import('./parser-category-flow.test.mjs');
+await import('./parser-recovery.test.mjs');
 await import('./lead-quality.test.mjs');
 await import('./max-bot-stage-2.test.mjs');
 await import('./cron-bot-reliability.test.mjs');

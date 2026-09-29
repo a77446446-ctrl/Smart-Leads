@@ -1,5 +1,7 @@
 // Дополняет уже найденный текст: не меняет селекторы и правила основного парсера.
-async (messages) => {
+async (input) => {
+  const messages = Array.isArray(input) ? input : input.messages;
+  const budgetMs = Array.isArray(input) ? 30000 : Math.max(0, Math.min(30000, input.budgetMs));
   const textSelector = '[class*="MessageText"], [class*="messageText"], .text-content, [class*="text-content"]';
   const boundarySelector = '[data-mid], [role="article"], article, div[data-id], .MessageList .Message, .messageWrapper, [class*="messageItem"], [class*="MessageItem"], [class*="message-item"]';
   const candidateSelector = '[data-mid], [role="article"], article, div[data-id], .MessageList .Message, [class*="Message"], [class*="message"], ' + textSelector;
@@ -80,7 +82,7 @@ async (messages) => {
     }
     return { urls: [] };
   };
-  const deadline = Date.now() + 30000;
+  const deadline = Date.now() + budgetMs;
   const groups = [];
   for (const message of messages) {
     let state = locate(message);

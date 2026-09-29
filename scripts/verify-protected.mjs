@@ -13,4 +13,4 @@ for (const [file, expected] of Object.entries(report.protectedSha256)) {
   if (actual !== baseline) { console.error('Изменён защищённый файл: ' + file); failed = true; }
 }
 if (failed) process.exitCode = 1;
-else console.log('Проверено защищённых файлов: ' + Object.keys(report.protectedSha256).length + '; учтены согласованные точки тематической обработки и фотографий; вход, сессии, прокси и остальной код совпадают с исходным.');
+else console.log('Проверено защищённых файлов: ' + Object.keys(report.protectedSha256).length + '; учтены точки тематической обработки, фотографий и восстановления после тайм-аута медиа; вход, сессии, прокси и остальной код совпадают с исходным.');

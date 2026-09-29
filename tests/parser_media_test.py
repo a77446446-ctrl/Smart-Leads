@@ -173,7 +173,7 @@ class PhotoTests(unittest.TestCase):
     def test_files_and_failure_isolation(self):
         data = b"\xff\xd8\xff" + b"x" * 20
         with tempfile.TemporaryDirectory(prefix="smart-leads-photos-") as root, patch.dict(os.environ, {"PARSER_CAPTURE_PHOTOS": "1", "LEAD_MEDIA_DIR": root}):
-            page = SimpleNamespace(on=lambda *args: None, evaluate=lambda script, messages: [{"urls": ["https://cdn.example/photo"] if message.get('id') == '1' else []} for message in messages])
+            page = SimpleNamespace(on=lambda *args: None, evaluate=lambda script, payload: [{"urls": ["https://cdn.example/photo"] if message.get('id') == '1' else []} for message in payload['messages']])
             collector = MessagePhotos(page)
             collector.responses["https://cdn.example/photo"] = SimpleNamespace(body=lambda: data)
             messages = [{"text": "Авто", "id": "1"}, {"text": "Спорт", "id": "2"}]

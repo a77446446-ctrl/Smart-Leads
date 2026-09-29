@@ -4,6 +4,7 @@ import os
 import time
 import uuid
 from pathlib import Path
+from parser_progress import deadline
 
 MAX_BYTES = 5 * 1024 * 1024
 MAX_BATCH_BYTES = 20 * 1024 * 1024
@@ -98,17 +99,21 @@ class MessagePhotos:
             directory.mkdir(parents=True, exist_ok=True, mode=0o700)
             usage = sum(file.stat().st_size for file in directory.iterdir() if file.is_file())
             total = 0
-            started = time.monotonic()
+            work_deadline = deadline(45)
             # Байты сохраняются до следующей прокрутки, пока MAX не отозвал blob.
             for message in reversed(messages):
-                if time.monotonic() - started > 45:
+                if time.monotonic() >= work_deadline:
                     message['photoError'] = 'Достигнут лимит ожидания фото за проход; текст сохранён'
                     continue
-                group = self.page.evaluate(DOM_SCRIPT, [message])[0]
+                remaining_ms = max(0, int((work_deadline - time.monotonic()) * 1000))
+                group = self.page.evaluate(DOM_SCRIPT, {"messages": [message], "budgetMs": remaining_ms})[0]
                 report['found'] += len(group['urls'][:6])
                 if group.get("error"):
                     message["photoError"] = group["error"]
                 for url in group["urls"][:6]:
+                    if time.monotonic() >= work_deadline:
+                        message["photoError"] = "Исчерпан общий бюджет медиа; текст сохранён"
+                        break
                     if usage >= MAX_STAGING_BYTES or total >= MAX_BATCH_BYTES:
                         message["photoError"] = "Достигнут лимит сбора фотографий за один проход"
                         break

@@ -2,8 +2,10 @@
 // 23.09.2026: дополнительно разрешено извлечение фотографий без изменения входа, сессий и прокси.
 // Удаляем только согласованные правки для сравнения всего остального файла с исходным SHA-256.
 // Эталон взят из de09017:src/services/max-parser.ts, переносы строк приведены к LF.
+import { originalBeforeRecovery } from './parser-recovery-extension.mjs';
 export const ORIGINAL_PARSER_NORMALIZED_SHA256 = '02d18d99caaac3e18ac1a377af0f388068c6fd2486b5b7a60910acd29dd7b4af';
 export function originalParserSource(source) {
+  source = originalBeforeRecovery('parser', source);
   const changes = [
     // 26.09.2026: сохранение настроек во время парсинга не должно откатываться его результатом.
     ["import { saveParserChatResults } from './parser-chat-results';", ''],
@@ -38,7 +40,7 @@ export function originalParserSource(source) {
 // Эталон Python-worker до дополнения фотографиями, переносы приведены к LF.
 export const ORIGINAL_WORKER_NORMALIZED_SHA256 = '0498e26e289da8005d6972bfdea41a653a4aa56c50c297a5233b386e2fff57e5';
 export function originalWorkerSource(source) {
-  source = source.replace(/\r\n/g, '\n');
+  source = originalBeforeRecovery('worker', source);
   // 27.09.2026: последовательное чтение конца истории, без изменения входа и прокси.
   source = source.replace('from parser_history import latest_messages\n', '');
   source = source.replace('            title = extract_title(page)\n            messages = latest_messages(page, extract_messages)',

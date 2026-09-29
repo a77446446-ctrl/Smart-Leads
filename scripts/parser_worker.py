@@ -23,6 +23,7 @@ from proxy_runtime import build_playwright_proxy
 from parser_media import MessagePhotos
 from parser_engagement import enrich_engagement
 from parser_history import latest_messages
+from parser_progress import begin, checkpoint, stage as report_stage
 
 SESSION_ID_RE = re.compile(r"^[A-Za-z0-9_-]{1,80}$")
 MAX_SESSION_BYTES = 10 * 1024 * 1024
@@ -267,6 +268,8 @@ def classify_exception(error, has_proxy):
 
 
 def run_parser(session_id, chat_url):
+    begin()
+    requested_chat_url = chat_url
     target, storage, meta = load_session(session_id)
     proxy_url = os.environ.get("PARSER_PROXY_URL") or meta.get("proxy") or "direct"
     relay = None
@@ -304,6 +307,7 @@ def run_parser(session_id, chat_url):
             if proxy:
                 launch_options["proxy"] = proxy
             stage = "запуск Chromium"
+            report_stage(stage)
             browser = playwright.chromium.launch(**launch_options)
             stage = "загрузка сессии браузера"
             context = browser.new_context(
@@ -317,11 +321,13 @@ def run_parser(session_id, chat_url):
 
             # Загружаем SPA сразу с маршрутом чата: MAX читает hash при старте приложения.
             stage = "открытие целевого чата MAX"
+            report_stage(stage)
             response = page.goto(chat_url, timeout=60_000, wait_until="domcontentloaded")
             if response and response.status == 429:
                 return result(chat_url, "RATE_LIMITED", error="Превышен лимит запросов MAX (429)")
 
             stage = "ожидание сообщений чата"
+            report_stage(stage)
             state = wait_for_app(page, seconds=30, check_messages=True)
             
             if state.get("login") and not state.get("ready"):
@@ -329,9 +335,13 @@ def run_parser(session_id, chat_url):
 
             page.wait_for_timeout(random.SystemRandom().randint(600, 1400))
             title = extract_title(page)
+            report_stage("чтение последних сообщений")
             messages = latest_messages(page, extract_messages)
             save_session(target, context, {**meta, "proxy": None, "formatVersion": 2})
+            checkpoint(result(requested_chat_url, "OK", title=title, messages=messages))
+            report_stage("обработка фотографий")
             photos.enrich(messages)
+            report_stage("обработка реакций")
             enrich_engagement(page, messages)
 
             empty_error = None
@@ -362,6 +372,7 @@ def run_parser(session_id, chat_url):
                 pass
         return result(chat_url, status, error=f"Этап «{stage}»: {error}")
     finally:
+        report_stage("закрытие браузера")
         if context:
             try:
                 context.close()
