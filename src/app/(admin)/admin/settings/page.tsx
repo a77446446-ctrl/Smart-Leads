@@ -2,6 +2,7 @@
 
 import { hasTargetedChats } from '@/lib/lead-filter-mode';
 import { saveAdminSettings } from '@/lib/save-admin-settings';
+import { readSavedParserChats } from '@/lib/parser-settings-view';
 
 import React, { useState, useEffect, useRef } from 'react';
 import Image from 'next/image';
@@ -259,10 +260,9 @@ export default function SettingsPage() {
     try {
       const url = silent ? '/api/admin/settings?runtime=true' : '/api/admin/settings';
       const res = await fetch(url, { cache: 'no-store', signal: AbortSignal.timeout(12000) });
-      if (!res.ok) throw new Error(`Сервер вернул ${res.status}`);
+      if (!res.ok) throw new Error(res.status === 401 ? 'Сессия истекла. Войдите повторно.' : res.status === 403 ? 'Нет доступа к настройкам администратора.' : `Не удалось прочитать настройки: сервер вернул ${res.status}. Повторите загрузку.`);
       const data: Setting[] = await res.json();
       if (!Array.isArray(data)) throw new Error('Сервер не вернул настройки');
-      if (!silent) { settingsLoadedRef.current = true; setSettingsLoaded(true); setLoadError(''); }
       const settingsMap: Record<string, string> = {};
       data.forEach(s => settingsMap[s.key] = s.value);
       
@@ -298,16 +298,16 @@ export default function SettingsPage() {
           return;
       }
 
+      // Проверяем весь список до изменения формы: ошибка не означает пустую очередь.
+      readSavedParserChats(settingsMap['maks_parsing_chats']);
       setSettings(settingsMap);
       if (settingsMap['maks_parsing_chats']) {
         try { 
             let chats = JSON.parse(settingsMap['maks_parsing_chats']); 
-            let changed = false;
             chats = chats.map((c: any) => {
                 let url = typeof c === 'string' ? c : c.url;
                 if (url.includes('max.ru') && !url.includes('web.max.ru')) {
                     url = url.replace('max.ru', 'web.max.ru');
-                    changed = true;
                 }
                 let name = typeof c === 'string' ? 'Новый чат' : c.name;
                 if (name && (name.includes('Новый чат') || name.includes('MAX') || name.includes('непрочитан') || name.includes('сообщен') || name.includes('Синхронизация'))) {
@@ -319,7 +319,6 @@ export default function SettingsPage() {
                         const slug = parts[parts.length-1] || parts[parts.length-2] || 'Чат';
                         name = slug.replace(/_/g, ' ').replace(/-/g, ' ').split(' ').map((w:string) => w.charAt(0).toUpperCase() + w.slice(1)).join(' ');
                     }
-                    changed = true;
                 }
                 if (typeof c === 'string') return { name, url, parseAll: true, lastRunLeadsCount: null, lastParsedAt: null };
                 return {
@@ -332,15 +331,7 @@ export default function SettingsPage() {
             });
             setParsingChats(chats);
             
-            // Auto-save fixed chats to DB
-            if (changed) {
-                fetch('/api/admin/settings', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ key: 'maks_parsing_chats', value: JSON.stringify(chats) }),
-                });
-            }
-        } catch (e) { setParsingChats([]); }
+        } catch (e) { throw new Error('Не удалось прочитать сохранённые чаты. Сохранение заблокировано.'); }
       }
       setAutoParseEnabled(settingsMap['maks_parser_auto'] === 'true');
       const interval = parseInt(settingsMap['maks_parser_interval'] || '300', 10);
@@ -370,18 +361,21 @@ export default function SettingsPage() {
           if (remaining < 0) remaining = 0;
           setNextRunSeconds(Math.floor(remaining));
       } else if (!silent) {
-          // If it's missing (never run), save the current time to DB so countdown doesn't reset on every refresh
-          const now = Date.now();
-          fetch('/api/admin/settings', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ key: 'maks_parser_last_run', value: String(now) }),
-          }).catch(console.error);
+          // Открытие формы не изменяет время запуска планировщика.
           setNextRunSeconds(Math.max(interval, 60));
       }
+      settingsLoadedRef.current = true;
+      setSettingsLoaded(true);
+      setLoadError('');
     } catch (error) {
-      console.error('Failed to fetch settings:', error);
-      if (!silent) setLoadError('Не удалось загрузить настройки. Обновите страницу и проверьте доступность базы данных.');
+      console.error('[НАСТРОЙКИ] Ошибка загрузки:', error);
+      if (!silent) {
+        settingsLoadedRef.current = false;
+        setSettingsLoaded(false);
+        setLoadError(error instanceof Error && error.name === 'TimeoutError'
+          ? 'Сервер не ответил за 12 секунд. Данные не изменены. Повторите загрузку.'
+          : error instanceof Error ? error.message : 'Не удалось загрузить настройки. Повторите загрузку.');
+      }
     }
     finally {
       settingsRequestRef.current = false;
@@ -446,7 +440,7 @@ export default function SettingsPage() {
   };
 
   const handleSave = async () => {
-    if (saving) return;
+    if (saving || !settingsLoadedRef.current) return;
     setSaving(true);
     setStatus('idle');
     setSaveError('');
@@ -828,6 +822,12 @@ export default function SettingsPage() {
   const inputClasses = "w-full bg-zinc-950 border border-zinc-700 rounded-lg py-2 pl-11 pr-4 text-xs font-medium focus:ring-1 focus:ring-black transition-all text-white placeholder:text-zinc-500 outline-none";
 
   if (!mounted) return null;
+  if (!settingsLoaded && loadError) return <section className="space-y-4 p-6">
+    <h1 className="text-lg font-bold">Настройки</h1>
+    <p role="alert" className="text-red-400">{loadError}</p>
+    <p className="text-sm text-zinc-400">Очередь чатов пока не загружена. Её содержимое и аккаунты нельзя определить по этой ошибке.</p>
+    <button type="button" onClick={() => void fetchSettings()} className="rounded bg-accent px-4 py-2 text-black">Повторить загрузку</button>
+  </section>;
   if (loading) return <div className="flex items-center justify-center h-full"><Loader2 className="animate-spin text-accent" size={32} /></div>;
 
   return (

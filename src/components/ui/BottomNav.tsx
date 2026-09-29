@@ -1,11 +1,10 @@
 'use client';
 
-import React, { useEffect, useState } from 'react';
+import React from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { LayoutDashboard, ListChecks, CreditCard, UserCircle } from 'lucide-react';
 import { cn } from '@/lib/utils';
-import { useUser } from '@/store/useUser';
 
 const userNavItems = [
   { icon: LayoutDashboard, label: 'Лента', href: '/dashboard' },
@@ -17,24 +16,20 @@ const adminProfileItem = { icon: UserCircle, label: 'Профиль', href: '/pr
 
 export const BottomNav = () => {
   const pathname = usePathname();
-  const [pendingHref, setPendingHref] = useState<string | null>(null);
-  useEffect(() => setPendingHref(null), [pathname]);
   const navItems = [...userNavItems, adminProfileItem];
 
   return (
     <div className="fixed bottom-0 left-0 right-0 h-20 bg-white border-t border-black flex justify-around items-center px-4 pb-4 z-50">
       {navItems.map((item) => {
-        const isActive = pathname === item.href || pendingHref === item.href;
+        const isActive = pathname === item.href;
         return (
           <Link
             key={item.href}
             href={item.href}
-            onClick={() => { if (pathname !== item.href) setPendingHref(item.href); }}
-            aria-busy={pendingHref === item.href}
             aria-current={pathname === item.href ? 'page' : undefined}
             className={cn(
               'flex flex-col items-center gap-1 transition-colors mt-2 min-w-14 rounded-md px-1 py-1 active:bg-accent',
-              pendingHref === item.href ? 'bg-accent text-black' : isActive ? 'text-black' : 'text-black/50 hover:text-black/80',
+              isActive ? 'bg-accent text-black' : 'text-black/50 hover:text-black/80',
             )}
           >
             <item.icon size={24} strokeWidth={isActive ? 2.5 : 2} />

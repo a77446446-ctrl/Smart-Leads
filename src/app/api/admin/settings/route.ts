@@ -18,11 +18,13 @@ export async function GET(request?: NextRequest) {
       });
       return NextResponse.json(runtimeSettings, { headers: { 'Cache-Control': 'no-store' } });
     }
-    const settings = await prisma.setting.findMany();
-    const activeTargetChats = await prisma.targetChat.findMany({
+    const [settings, activeTargetChats] = await Promise.all([
+      prisma.setting.findMany(),
+      prisma.targetChat.findMany({
       where: { active: true, status: 'ACTIVE' },
       select: { url: true, parseAll: true },
-    });
+      }),
+    ]);
     const displaySettings = settings.filter((setting) => setting.key !== 'maks_active_target_chats' && setting.key !== APPLICATION_THEME_SETTING_KEY && !isInstanceSettingKey(setting.key));
     displaySettings.push({ id: 'runtime-active-target-chats', key: 'maks_active_target_chats', value: JSON.stringify(activeTargetChats) });
     return NextResponse.json(displaySettings.map((setting) =>
