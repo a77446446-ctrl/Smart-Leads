@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useCallback, useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { LeadCard } from '@/components/cards/LeadCard';
 import { useUser } from '@/store/useUser';
 import { Search, Filter, Loader2 } from 'lucide-react';
@@ -18,13 +18,17 @@ export default function DashboardPage() {
   const [activeCity, setActiveCity] = useState('all');
   const [cityOpen, setCityOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
+  const leadsRequestRef = useRef(false);
 
 
   const fetchLeads = useCallback(async (showLoading = true) => {
+    if (leadsRequestRef.current) return;
+    leadsRequestRef.current = true;
     try {
       if (showLoading) setLoading(true);
       const leadQuery = focusedLeadId ? `&leadId=${encodeURIComponent(focusedLeadId)}` : '';
-      const response = await fetch(`/api/leads?status=NEW&take=200${leadQuery}`);
+      const response = await fetch(`/api/leads?status=NEW&take=200${leadQuery}`, { signal: AbortSignal.timeout(12000) });
+      if (!response.ok) throw new Error(`Сервер вернул ${response.status}`);
       const data = await response.json();
       if (Array.isArray(data)) {
         setLeads(data);
@@ -34,6 +38,7 @@ export default function DashboardPage() {
     } catch (error) {
       console.error('Failed to fetch leads', error);
     } finally {
+      leadsRequestRef.current = false;
       if (showLoading) setLoading(false);
     }
   }, [focusedLeadId]);
@@ -42,7 +47,9 @@ export default function DashboardPage() {
     fetchLeads();
 
 
-    const intervalId = setInterval(() => fetchLeads(false), 15_000);
+    const intervalId = setInterval(() => {
+      if (!document.hidden) void fetchLeads(false);
+    }, 30_000);
     return () => clearInterval(intervalId);
   }, [fetchLeads]);
 

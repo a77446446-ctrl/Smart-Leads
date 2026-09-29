@@ -37,9 +37,11 @@ export default function AdminLayout({
 }) {
   const pathname = usePathname();
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+  const [pendingHref, setPendingHref] = useState<string | null>(null);
 
   useEffect(() => {
     setIsMobileMenuOpen(false);
+    setPendingHref(null);
   }, [pathname]);
 
   useEffect(() => {
@@ -53,12 +55,14 @@ export default function AdminLayout({
     <>
       <nav className="flex flex-1 flex-col gap-2">
         {adminNav.map((item) => {
-          const isActive = pathname === item.href;
+          const isActive = pathname === item.href || pendingHref === item.href;
           return (
             <Link
               key={item.href}
               href={item.href}
-              aria-current={isActive ? 'page' : undefined}
+              onClick={() => { if (pathname !== item.href) setPendingHref(item.href); }}
+              aria-current={pathname === item.href ? 'page' : undefined}
+              aria-busy={pendingHref === item.href}
               className={cn(
                 'flex min-h-11 sm:min-h-12 items-center gap-3 rounded-xl border border-transparent px-3 py-2 sm:px-4 sm:py-3 text-xs sm:text-xs sm:text-sm font-bold uppercase transition-all',
                 isActive
@@ -75,7 +79,9 @@ export default function AdminLayout({
 
       <Link
         href="/dashboard"
-        className="flex min-h-11 sm:min-h-12 items-center gap-3 rounded-xl border border-transparent px-3 py-2 sm:px-4 sm:py-3 text-xs sm:text-xs sm:text-sm font-bold uppercase text-zinc-400 transition-all hover:border-zinc-700 hover:bg-zinc-800 hover:text-white"
+        onClick={() => setPendingHref('/dashboard')}
+        aria-busy={pendingHref === '/dashboard'}
+        className={cn('flex min-h-11 sm:min-h-12 items-center gap-3 rounded-xl border border-transparent px-3 py-2 sm:px-4 sm:py-3 text-xs sm:text-xs sm:text-sm font-bold uppercase transition-all hover:border-zinc-700 hover:bg-zinc-800 hover:text-white', pendingHref === '/dashboard' ? 'border-accent bg-accent text-black' : 'text-zinc-400')}
       >
         <ArrowLeft className="w-4 h-4 sm:w-[18px] sm:h-[18px]" />
         В приложение

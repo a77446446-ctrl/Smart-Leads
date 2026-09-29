@@ -14,14 +14,15 @@ export default function AdminLeadsPage() {
   // For actions dropdown
   const [openMenuId, setOpenMenuId] = useState<string | null>(null);
   const menuRef = useRef<HTMLTableElement>(null);
+  const leadsRequestRef = useRef(false);
 
   useEffect(() => {
     fetchLeads();
     
-    // Auto-refresh every 10 seconds
+    // Обновляем только видимую вкладку и не создаём очередь запросов.
     const interval = setInterval(() => {
-      fetchLeads(true);
-    }, 10000);
+      if (!document.hidden) void fetchLeads(true);
+    }, 30000);
     
     // Close menu on outside click
     const handleClickOutside = (event: MouseEvent) => {
@@ -37,14 +38,18 @@ export default function AdminLeadsPage() {
   }, []);
 
   const fetchLeads = async (silent = false) => {
+    if (leadsRequestRef.current) return;
+    leadsRequestRef.current = true;
     try {
       if (!silent) setLoading(true);
-      const res = await fetch('/api/admin/leads?take=500');
+      const res = await fetch('/api/admin/leads?take=500', { signal: AbortSignal.timeout(12000) });
+      if (!res.ok) throw new Error(`Сервер вернул ${res.status}`);
       const data = await res.json();
       setLeads(Array.isArray(data) ? data : []);
     } catch (err) {
       console.error('Failed to fetch leads', err);
     } finally {
+      leadsRequestRef.current = false;
       if (!silent) setLoading(false);
     }
   };

@@ -7,10 +7,17 @@ import { APPLICATION_THEME_SETTING_KEY } from '@/lib/application-theme';
 
 export const dynamic = 'force-dynamic';
 
-export async function GET() {
+export async function GET(request?: NextRequest) {
   const denied = await adminGuard();
   if (denied) return denied;
   try {
+    if (request?.nextUrl.searchParams.get('runtime') === 'true') {
+      const runtimeSettings = await prisma.setting.findMany({
+        where: { key: { in: ['maks_parsing_chats', 'sync_logs'] } },
+        select: { key: true, value: true },
+      });
+      return NextResponse.json(runtimeSettings, { headers: { 'Cache-Control': 'no-store' } });
+    }
     const settings = await prisma.setting.findMany();
     const activeTargetChats = await prisma.targetChat.findMany({
       where: { active: true, status: 'ACTIVE' },

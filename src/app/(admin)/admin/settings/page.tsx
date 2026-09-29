@@ -174,6 +174,9 @@ export default function SettingsPage() {
   const [canBypass, setCanBypass] = useState(false);
   const [proxyLoaded, setProxyLoaded] = useState(false);
   const lastSyncLogsRef = useRef<string | null>(null);
+  const settingsRequestRef = useRef(false);
+  const sessionsRequestRef = useRef(false);
+  const settingsLoadedRef = useRef(false);
   const [savedProxyIdentity, setSavedProxyIdentity] = useState('');
   const [hasSavedProxyPassword, setHasSavedProxyPassword] = useState(false);
 
@@ -240,22 +243,26 @@ export default function SettingsPage() {
     fetchSessions();
     setLogs([{ time: new Date().toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'}), msg: 'Система готова к работе', type: 'info' }]);
     
-    // Auto-refresh stats every 10 seconds (only if no unsaved changes)
+    // Фоновый опрос не должен накапливать запросы при занятом сервере.
     const interval = setInterval(() => {
-      fetchSettings(true);
+      if (document.hidden) return;
+      fetchSettings(settingsLoadedRef.current);
       fetchSessions(true);
-    }, 10000);
+    }, 30000);
     
     return () => clearInterval(interval);
   }, []);
 
   const fetchSettings = async (silent = false) => {
+    if (settingsRequestRef.current) return;
+    settingsRequestRef.current = true;
     try {
-      const res = await fetch('/api/admin/settings', { cache: 'no-store' });
+      const url = silent ? '/api/admin/settings?runtime=true' : '/api/admin/settings';
+      const res = await fetch(url, { cache: 'no-store', signal: AbortSignal.timeout(12000) });
       if (!res.ok) throw new Error(`Сервер вернул ${res.status}`);
       const data: Setting[] = await res.json();
       if (!Array.isArray(data)) throw new Error('Сервер не вернул настройки');
-      if (!silent) { setSettingsLoaded(true); setLoadError(''); }
+      if (!silent) { settingsLoadedRef.current = true; setSettingsLoaded(true); setLoadError(''); }
       const settingsMap: Record<string, string> = {};
       data.forEach(s => settingsMap[s.key] = s.value);
       
@@ -376,13 +383,18 @@ export default function SettingsPage() {
       console.error('Failed to fetch settings:', error);
       if (!silent) setLoadError('Не удалось загрузить настройки. Обновите страницу и проверьте доступность базы данных.');
     }
-    finally { if (!silent) setLoading(false); }
+    finally {
+      settingsRequestRef.current = false;
+      if (!silent) setLoading(false);
+    }
   };
 
   const fetchSessions = async (_silent = false): Promise<MaksSession[] | null> => {
+    if (sessionsRequestRef.current) return null;
+    sessionsRequestRef.current = true;
     try {
       const url = _silent ? '/api/admin/auth/sessions?sync=false' : '/api/admin/auth/sessions';
-      const res = await fetch(url, { cache: 'no-store' });
+      const res = await fetch(url, { cache: 'no-store', signal: AbortSignal.timeout(12000) });
       const data = await res.json() as { sessions?: MaksSession[]; error?: string };
       if (!res.ok || !Array.isArray(data.sessions)) throw new Error(data.error || 'Сервер не вернул аккаунты');
       setSessions(data.sessions);
@@ -390,6 +402,8 @@ export default function SettingsPage() {
     } catch (error) {
       console.error('Failed to fetch sessions:', error);
       return null;
+    } finally {
+      sessionsRequestRef.current = false;
     }
   };
 
@@ -848,7 +862,10 @@ export default function SettingsPage() {
           </div>
         </button>
       </div>
-      {loadError && <p role="alert" className="mx-4 mt-4 rounded-lg border border-red-700 bg-red-950 p-3 text-sm text-red-100 sm:mx-6">{loadError}</p>}
+      {loadError && <div role="alert" className="mx-4 mt-4 flex flex-wrap items-center gap-3 rounded-lg border border-red-700 bg-red-950 p-3 text-sm text-red-100 sm:mx-6">
+        <span>{loadError}</span>
+        <button type="button" onClick={() => void fetchSettings()} className="rounded border border-red-400 px-3 py-1 font-bold hover:bg-red-900">Повторить</button>
+      </div>}
       {status === 'error' && <p role="alert" className="mx-4 mt-4 rounded-lg border border-red-700 bg-red-950 p-3 text-sm text-red-100 sm:mx-6">{saveError}</p>}
       {status === 'success' && <p role="status" className="mx-4 mt-4 rounded-lg border border-green-700 bg-green-950 p-3 text-sm text-green-100 sm:mx-6">Настройки и чаты сохранены.</p>}
 
